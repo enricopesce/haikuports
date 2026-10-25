@@ -53,7 +53,6 @@ BUILD_REQUIRES="
 	haiku${secondaryArchSuffix}_devel
 	"
 BUILD_PREREQUIRES="
-	cmd:ar$secondaryArchSuffix
 	cmd:cmp
 	cmd:gcc$secondaryArchSuffix
 	cmd:ld$secondaryArchSuffix
@@ -61,46 +60,45 @@ BUILD_PREREQUIRES="
 	cmd:sed
 	"
 
-debugList=("$libDir"/libbz2.so.$portVersion)
+if [ "$isCrossRepository" != true ]; then
+debugList=("$installDestDir$libDir"/libbz2.so.$portVersion)
 if [ -z "$secondaryArchSuffix" ]; then
-	debugList+=("$binDir"/bzip2)
-	debugList+=("$binDir"/bzip2recover)
+	debugList+=("$installDestDir$binDir"/bzip2)
+	debugList+=("$installDestDir$binDir"/bzip2recover)
 fi
 defineDebugInfoPackage bzip2$secondaryArchSuffix "${debugList[@]}"
+fi
 
 BUILD()
 {
-	make $jobArgs
-	make $jobArgs -f Makefile-libbz2_so
+	make clean
+	make $jobArgs -f Makefile-libbz2_so CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib" AR=$targetMachineTriple-ar
+	make $jobArgs CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib" AR=$targetMachineTriple-ar libbz2.a bzip2 bzip2recover
 		# shared libary not built by default
 }
 
 INSTALL()
 {
-	make install PREFIX=$prefix BINDIR=$binDir \
-		LIBDIR=$libDir \
-		INCLUDEDIR=$includeDir \
-		MANDIR=$manDir/man1
+	make install PREFIX=$installDestDir$prefix BINDIR=$installDestDir$binDir LIBDIR=$installDestDir$libDir INCLUDEDIR=$installDestDir$includeDir MANDIR=$installDestDir$manDir/man1
 
 	# also install shared lib
 	ln -sf libbz2.so.$portVersion libbz2.so
-	cp -a libbz2.so.$portVersion libbz2.so.1.0 libbz2.so $libDir
+	cp -a libbz2.so.$portVersion libbz2.so.1.0 libbz2.so $installDestDir$libDir
 
 	# remove static library
-	rm $libDir/*.a
+	rm $installDestDir$libDir/*.a
 
 	# cleanup empty directory
-	rm -rf $manDir/man1/man
+	rm -rf $installDestDir$manDir/man1/man
 	prepareInstalledDevelLib libbz2
 
 	# devel package
-	packageEntries devel \
-		$developDir
+	packageEntries devel $installDestDir$developDir
 
-	#remove bin commands and man pages when building for secondary arch
-	if [ -n "$secondaryArchSuffix" ];then
-		rm -rf $prefix/bin
-		rm -rf $manDir
+	# remove bin commands and man pages when building for secondary arch
+	if [ -n "$secondaryArchSuffix" ]; then
+		rm -rf $installDestDir$prefix/bin
+		rm -rf $installDestDir$manDir
 	fi
 }
 

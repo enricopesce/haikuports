@@ -148,48 +148,46 @@ BUILD_PREREQUIRES="
 	cmd:make
 	"
 
+if [ "$isCrossRepository" != true ]; then
 if [ -z "$secondaryArchSuffix" ]; then
-	defineDebugInfoPackage libiconv$secondaryArchSuffix \
-		$binDir/iconv \
-		$libDir/libiconv.so.$libiconvVersion \
-		$libDir/libcharset.so.$libcharsetVersion
+	defineDebugInfoPackage libiconv$secondaryArchSuffix 		$binDir/iconv 		$libDir/libiconv.so.$libiconvVersion 		$libDir/libcharset.so.$libcharsetVersion
 else
-	defineDebugInfoPackage libiconv$secondaryArchSuffix \
-		$libDir/libiconv.so.$libiconvVersion \
-		$libDir/libcharset.so.$libcharsetVersion
+	defineDebugInfoPackage libiconv$secondaryArchSuffix 		$libDir/libiconv.so.$libiconvVersion 		$libDir/libcharset.so.$libcharsetVersion
+fi
 fi
 
 BUILD()
 {
 	ln -s build-aux/compile compile || true
-	runConfigure ./configure \
-		--enable-relocatable \
-		--enable-shared \
-		--disable-static \
-		--disable-nls \
-		--enable-extra-encodings
+	local crossArgs
+	if [ "$isCrossRepository" = true ]; then
+		crossArgs="--build=$buildMachineTriple --host=$targetMachineTriple"
+		export CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib"
+		export AR="$targetMachineTriple-ar"
+	fi
+	runConfigure ./configure $crossArgs 		--enable-relocatable 		--enable-shared 		--disable-static 		--disable-nls 		--enable-extra-encodings
 	make $jobArgs
 }
 
 INSTALL()
 {
-	ACLOCALDIR=$prefix/data/aclocal
-	mkdir -p ${ACLOCALDIR}
-	cp -f srcm4/iconv.m4 ${ACLOCALDIR}/iconv.m4
-	make install
+	ACLOCALDIR=$installDestDir$prefix/data/aclocal
+	mkdir -p $ACLOCALDIR
+	cp -f srcm4/iconv.m4 $ACLOCALDIR/iconv.m4
+	make install DESTDIR=$installDestDir
 
-	rm $libDir/*.la
+	rm $installDestDir$libDir/*.la
 
 	# remove command for secondary architecture
 	if [ -n "$secondaryArchSuffix" ]; then
-		rm -rf $binDir
+		rm -rf $installDestDir$binDir
 	fi
 
 	prepareInstalledDevelLibs libiconv libcharset
 
 	# Add pkgconfig file
-	mkdir -p $developLibDir/pkgconfig
-	cat > $developLibDir/pkgconfig/iconv.pc << EOF
+	mkdir -p $installDestDir$developLibDir/pkgconfig
+	cat > $installDestDir$developLibDir/pkgconfig/iconv.pc << EOF
 bindir=$prefix/bin
 exec_prefix=$prefix
 libdir=$libDir
@@ -203,11 +201,7 @@ Cflags: -I$includeDir
 EOF
 
 	# devel package
-	packageEntries devel \
-		$developDir \
-		$manDir/man3 \
-		$dataDir \
-		$docDir/*.3.html
+	packageEntries devel $installDestDir$developDir $installDestDir$manDir/man3 $installDestDir$dataDir $installDestDir$docDir/*.3.html
 }
 
 TEST()

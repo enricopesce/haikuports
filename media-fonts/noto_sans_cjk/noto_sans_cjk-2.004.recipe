@@ -65,7 +65,7 @@ BUILD()
 
 INSTALL()
 {
-	FONTDIR=$fontsDir/otfonts
+	FONTDIR=$installDestDir$prefix/data/fonts/otfonts
 	mkdir -p ${FONTDIR}
 
 	cp Variable/OTF/Mono/NotoSansMonoCJK*-VF.otf ${FONTDIR}

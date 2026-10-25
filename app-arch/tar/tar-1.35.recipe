@@ -67,16 +67,22 @@ TEST_REQUIRES+="
 	"
 fi
 
-defineDebugInfoPackage tar$secondaryArchSuffix $commandBinDir/tar
+if [ "$isCrossRepository" != true ]; then
+	defineDebugInfoPackage tar$secondaryArchSuffix $commandBinDir/tar
+fi
 
 BUILD()
 {
 	local yearArg
+	local crossArgs
+	if [ "$isCrossRepository" = true ]; then
+		crossArgs="--build=$buildMachineTriple --host=$targetMachineTriple"
+	fi
 	if [ "$targetArchitecture" = x86_gcc2 ]; then
 		yearArg="--disable-year2038"
 	fi
 
-	runConfigure --omit-dirs binDir ./configure --bindir=$commandBinDir \
+	CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib" AR="$targetMachineTriple-ar" runConfigure --omit-dirs binDir ./configure --bindir=$commandBinDir $crossArgs \
 		--disable-nls \
 		--disable-gcc-warnings \
 		LDFLAGS="-lnetwork" CFLAGS="-D_BSD_SOURCE" \
@@ -87,7 +93,7 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	make install DESTDIR=$installDestDir
 }
 
 TEST()
