@@ -67,6 +67,10 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		export PKG_CONFIG_SYSROOT_DIR="$crossSysrootDir"
+		export PKG_CONFIG_LIBDIR="$crossSysrootDir/boot/system/develop/lib/pkgconfig:$crossSysrootDir/boot/system/develop/share/pkgconfig"
+	fi
 	runConfigure --omit-dirs binDir \
 		./configure --bindir="$prefix/bin"
 	make $jobArgs
@@ -74,9 +78,15 @@ BUILD()
 
 INSTALL()
 {
-	make install
-	strip $prefix/bin/tcpdump
-	rm $prefix/bin/tcpdump.$portVersion
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+		"$targetMachineTriple-strip" "$installDestDir$prefix/bin/tcpdump"
+		rm -f "$installDestDir$prefix/bin/tcpdump.$portVersion"
+	else
+		make install
+		strip $prefix/bin/tcpdump
+		rm $prefix/bin/tcpdump.$portVersion
+	fi
 }
 
 TEST()

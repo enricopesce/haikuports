@@ -39,11 +39,14 @@ BUILD_PREREQUIRES="
 	cmd:automake
 	cmd:gcc$secondaryArchSuffix
 	cmd:make
+	cmd:readelf
 	cmd:pkg_config$secondaryArchSuffix
 	"
 
-defineDebugInfoPackage nghttp2$secondaryArchSuffix \
-	"$libDir"/libnghttp2.so.$libVersion
+if [ "$targetArchitecture" != "arm64" ]; then
+	defineDebugInfoPackage nghttp2$secondaryArchSuffix \
+		"$libDir"/libnghttp2.so.$libVersion
+fi
 
 BUILD()
 {
@@ -56,6 +59,19 @@ BUILD()
 INSTALL()
 {
 	make install
+	if [ "$targetArchitecture" = "arm64" ]; then
+		arm64RuntimeLibDir="$installDestDir$prefix/$relativeLibDir"
+		mkdir -p "$arm64RuntimeLibDir"
+		for sharedLibrary in "$sourceDir/lib/.libs"/libnghttp2.so*; do
+			[ -e "$sharedLibrary" ] || [ -L "$sharedLibrary" ] || continue
+			cp -af "$sharedLibrary" "$arm64RuntimeLibDir/"
+		done
+		[ -e "$arm64RuntimeLibDir/libnghttp2.so" ] || { echo "ARM64 libnghttp2 staging failed" >&2; exit 1; }
+		arm64HeaderDir="$installDestDir$prefix/$relativeIncludeDir/nghttp2"
+		mkdir -p "$arm64HeaderDir"
+		cp -af "$sourceDir/lib/includes/nghttp2/." "$arm64HeaderDir/"
+	fi
+
 
 	rm -f "$libDir"/libnghttp2.la "$libDir"/libnghttp2.a
 
@@ -64,8 +80,12 @@ INSTALL()
 	prepareInstalledDevelLib libnghttp2
 	fixPkgconfig
 
+	if [ "$targetArchitecture" = "arm64" ]; then
+		rm -rf "$(getPackagePrefix devel)/$relativeDevelopDir"
+	fi
+
 	packageEntries devel \
-		"$developDir"
+		"$relativeDevelopDir"
 
 	rmdir "$manDir"
 }

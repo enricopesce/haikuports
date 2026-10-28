@@ -40,12 +40,27 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	runConfigure --omit-dirs "docDir dataRootDir" ./configure
+	if [ "$targetArchitecture" = arm64 ]; then
+		# Generate the math bytecode with the existing host interpreter.
+		cat > bc/fix-libmath_h <<'EOF'
+#!/bin/sh
+sed -i '1s/^/{"/;s/$/",/;2,$s/^/"/' libmath.h
+sed -i '$d' libmath.h
+sed -i '$s/,$/,0}/' libmath.h
+EOF
+		chmod +x bc/fix-libmath_h
+		sed -i "s|\./fbc -c|/usr/bin/bc -c|" bc/Makefile
+	fi
 	make -j1
 }
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+	else
+		make install
+	fi
 }
 
 TEST()

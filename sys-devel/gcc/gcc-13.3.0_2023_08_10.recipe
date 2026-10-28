@@ -246,11 +246,15 @@ if $targetHasLibquadmath; then
 		)
 fi
 set -e
+if [ "$isCrossRepository" != true ]; then
 defineDebugInfoPackage gcc$secondaryArchSuffix "${debugList[@]}"
+fi
 
 BUILD()
 {
-	rm -rf $objectsDir
+	if [ "$HAIKU_RESUME_BUILD" != "1" ]; then
+		rm -rf $objectsDir
+	fi
 
 	mkdir -p $objectsDir
 	cd $objectsDir
@@ -270,8 +274,23 @@ BUILD()
 		kernelCcFlags="$kernelCcFlags -mno-red-zone"
 	fi
 
+	local buildConfigureFlags="--build=$effectiveTargetMachineTriple"
+	local crossConfigureFlags=
+	local sanitizerConfigureFlag=--enable-libsanitizer
+	if [ "$isCrossRepository" = true ]; then
+		buildConfigureFlags="--build=$buildMachineTriple --host=$targetMachineTriple --target=$targetMachineTriple"
+		sanitizerConfigureFlag=--disable-libsanitizer
+		crossConfigureFlags="--disable-bootstrap --disable-libobjc --with-gmp=$crossSysrootDir/boot/system/develop --with-mpfr=$crossSysrootDir/boot/system/develop --with-mpc=$crossSysrootDir/boot/system/develop"
+		local sanitizerPrivateHeaders="$crossSysrootDir/boot/system/develop/headers/private"
+		export CPPFLAGS="-I$crossSysrootDir/boot/system/develop/headers -I$sanitizerPrivateHeaders"
+		export EXTRA_CXXFLAGS="-I$sanitizerPrivateHeaders -I$sanitizerPrivateHeaders/system/arch/$targetArchitecture -I$sanitizerPrivateHeaders/system"
+		export LDFLAGS="-L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib"
+		export ac_cv_c_bigendian=no
+		export CC=$targetMachineTriple-gcc CXX=$targetMachineTriple-g++ AR=$targetMachineTriple-ar RANLIB=$targetMachineTriple-ranlib
+	fi
+
 	 "$sourceDir/configure" \
-	--build=$effectiveTargetMachineTriple \
+	$buildConfigureFlags \
 		--prefix=$installDir --libexecdir=$installDir/lib --mandir=$manDir \
 		--docdir=$docDir --enable-threads=posix \
 		--disable-nls --enable-shared --with-gnu-ld --with-gnu-as \
@@ -282,8 +301,8 @@ BUILD()
 		--enable-__cxa-atexit --with-system-zlib --enable-checking=release \
 		--with-bug-url=http://dev.haiku-os.org/ \
 		--with-default-libstdcxx-abi=gcc4-compatible \
-		--enable-libssp --enable-libsanitizer --enable-host-shared \
-		$additionalConfigureFlags
+		--enable-libssp $sanitizerConfigureFlag --enable-host-shared \
+		$additionalConfigureFlags $crossConfigureFlags
 
 	make $jobArgs
 
@@ -383,6 +402,26 @@ INSTALL()
 	make install
 	make install-html
 
+	# Cross installs may omit the Fortran frontend even when it was built.
+	if [ "$targetArchitecture" = "arm64" ] && [ ! -e "$installDestDir$prefix/$relativeInstallDir/$gccLibDir/f951" ]; then
+		mkdir -p "$installDestDir$prefix/$relativeInstallDir/$gccLibDir"
+		cp $objectsDir/gcc/f951 "$installDestDir$prefix/$relativeInstallDir/$gccLibDir/f951"
+	fi
+
+	if [ "$targetArchitecture" = "arm64" ] && [ ! -e "$installDestDir$prefix/develop/lib/libgfortran.a" ]; then
+		mkdir -p "$installDestDir$prefix/develop/lib"
+		cp $objectsDir/$effectiveTargetMachineTriple/libgfortran/.libs/libgfortran.a "$installDestDir$prefix/develop/lib/libgfortran.a"
+	fi
+	fortranInstallDir="$installDestDir$prefix/$relativeInstallDir/$gccLibDir"
+	if [ "$targetArchitecture" = "arm64" ]; then
+		if [ ! -e "$fortranInstallDir/libcaf_single.a" ]; then
+			cp $objectsDir/$effectiveTargetMachineTriple/libgfortran/.libs/libcaf_single.a "$fortranInstallDir/libcaf_single.a"
+		fi
+		if [ ! -e "$fortranInstallDir/libgfortran.spec" ]; then
+			cp $objectsDir/$effectiveTargetMachineTriple/libgfortran/libgfortran.spec "$fortranInstallDir/libgfortran.spec"
+		fi
+	fi
+
 	### HTML documentation ####################################
 
 	echo "Organizing HTML documentation..."
@@ -405,17 +444,28 @@ INSTALL()
 	mkdir -p $libDir
 	mkdir -p $developLibDir
 	cd $installDir
+	# Cross install may build target runtime libraries without installing them.
+	if [ "$targetArchitecture" = "arm64" ]; then
+		for sharedLibrary in "$objectsDir/$effectiveTargetMachineTriple/libatomic/.libs"/libatomic.so* "$objectsDir/$effectiveTargetMachineTriple/libgcc"/libgcc_s.so* "$objectsDir/$effectiveTargetMachineTriple/libgfortran/.libs"/libgfortran.so* "$objectsDir/$effectiveTargetMachineTriple/libgomp/.libs"/libgomp.so* "$objectsDir/$effectiveTargetMachineTriple/libssp/.libs"/libssp.so* "$objectsDir/$effectiveTargetMachineTriple/libstdc++-v3/src/.libs"/libstdc++.so*; do
+			[ -e "$sharedLibrary" ] || continue
+			cp -a "$sharedLibrary" "$gccLibDir/"
+		done
+		ln -sfn libstdc++.so "$gccLibDir/libsupc++.so"
+	fi
 
-	# libasan
-	mv $gccLibDir/libasan.so \
-		$gccLibDir/libasan.so.$libasanSoVersion \
-		$gccLibDir/libasan.so.$libasanLibVersion \
-		$libDir/
-	ln -s $libDir/libasan.so \
-		$libDir/libasan.so.$libasanSoVersion \
-		$libDir/libasan.so.$libasanLibVersion \
-		$gccLibDir
-	rm $gccLibDir/libasan.a
+
+	if [ "$sanitizerConfigureFlag" = "--enable-libsanitizer" ]; then
+		# libasan
+		mv $gccLibDir/libasan.so \
+			$gccLibDir/libasan.so.$libasanSoVersion \
+			$gccLibDir/libasan.so.$libasanLibVersion \
+			$libDir/
+		ln -s $libDir/libasan.so \
+			$libDir/libasan.so.$libasanSoVersion \
+			$libDir/libasan.so.$libasanLibVersion \
+			$gccLibDir
+		rm $gccLibDir/libasan.a
+	fi
 
 	# libatomic
 	mv $gccLibDir/libatomic.so \
@@ -502,16 +552,18 @@ INSTALL()
 	ln -s $libDir/libstdc++.so $libDir/libsupc++.so
 	mv $gccLibDir/libsupc++*.a $developLibDir/
 
-	# libubsan
-	mv $gccLibDir/libubsan.so \
-		$gccLibDir/libubsan.so.$libubsanSoVersion \
-		$gccLibDir/libubsan.so.$libubsanLibVersion \
-		$libDir/
-	ln -s $libDir/libubsan.so \
-		$libDir/libubsan.so.$libubsanSoVersion \
-		$libDir/libubsan.so.$libubsanLibVersion \
-		$gccLibDir
-	rm $gccLibDir/libubsan.a
+	if [ "$sanitizerConfigureFlag" = "--enable-libsanitizer" ]; then
+		# libubsan
+		mv $gccLibDir/libubsan.so \
+			$gccLibDir/libubsan.so.$libubsanSoVersion \
+			$gccLibDir/libubsan.so.$libubsanLibVersion \
+			$libDir/
+		ln -s $libDir/libubsan.so \
+			$libDir/libubsan.so.$libubsanSoVersion \
+			$libDir/libubsan.so.$libubsanLibVersion \
+			$gccLibDir
+		rm $gccLibDir/libubsan.a
+	fi
 
 	# libgcc
 	cp $objectsDir/$effectiveTargetMachineTriple/libgcc/libgcc-kernel.a \
@@ -574,6 +626,8 @@ INSTALL()
 
 	# create missing cc symlink
 	ln -sf gcc $installDir/bin/cc
+	# GCC selects the Fortran frontend from the gfortran driver name.
+	ln -sf gcc $installDir/bin/gfortran
 
 	# make all tools available via default paths
 	mkdir -p $binDir
@@ -581,6 +635,8 @@ INSTALL()
 		gcov-tool gfortran lto-dump ; do
 		symlinkRelative -sfn $installDir/bin/$f $binDir
 	done
+	mkdir -p "$installDestDir$prefix/bin"
+	ln -sf gcc "$installDestDir$prefix/bin/gfortran"
 
 	# make the ${effectiveTargetMachineTriple}-gcc-${$gccVersion} accessible in the libdir; this is
 	# the driver for gcc jit and it needs to be able to find it in PATH
@@ -613,31 +669,90 @@ INSTALL()
 
 	### Sub Packages ##########################################
 
+if [ "$targetArchitecture" != "arm64" ]; then
+if [ -d "$installDestDir$prefix/$relativeInstallDir/$gccLibDir/finclude" ]; then
+	packageEntries "fortran" $relativeInstallDir/$gccLibDir/finclude
+fi
+	packageEntries "fortran" "$developDir/tools$secondaryArchSubDir/bin/"*gfortran
+fi
 	packageEntries "fortran" \
 		$relativeBinDir/gfortran \
-		$developDir/tools$secondaryArchSubDir/bin/*gfortran \
-		$installDir/$gccLibDir/f951 \
-		$installDir/$gccLibDir/finclude \
-		$installDir/$gccLibDir/libcaf_single.a \
-		$developLibDir/libgfortran.a \
-		$installDir/$gccLibDir/libgfortran.spec
+		$relativeInstallDir/$gccLibDir/f951 \
+		$relativeInstallDir/$gccLibDir/libcaf_single.a \
+		develop/lib/libgfortran.a \
+		$relativeInstallDir/$gccLibDir/libgfortran.spec
 
 	rm -rf $installDir/$gccLibDir/{f951, finclude, libcaf_single*, libgfortran*}
 
+if [ "$targetArchitecture" != "arm64" ]; then
 	packageEntries "jit" \
 		$relativeLibDir/libgccjit.so \
 		$relativeLibDir/libgccjit.so.$libgccjitSoVersion \
 		$relativeLibDir/libgccjit.so.$libgccjitLibVersion
 
 	packageEntries "jit_devel" \
-		$developLibDir/libgccjit.so* \
+		develop/lib/libgccjit.so* \
 		$relativeIncludeDir/libgccjit.h \
 		$relativeIncludeDir/libgccjit++.h
+fi
 
+if [ "$targetArchitecture" != "arm64" ]; then
 	packageEntries "syslibs" \
 		$relativeLibDir/libasan.so \
 		$relativeLibDir/libasan.so.$libasanSoVersion \
 		$relativeLibDir/libasan.so.$libasanLibVersion \
+		$relativeLibDir/libubsan.so \
+		$relativeLibDir/libubsan.so.$libubsanSoVersion \
+		$relativeLibDir/libubsan.so.$libubsanLibVersion
+fi
+
+	if [ "$targetArchitecture" = "arm64" ]; then
+		arm64RuntimeLibDir="$installDestDir$prefix/$relativeLibDir"
+		mkdir -p "$arm64RuntimeLibDir"
+		for sharedLibrary in "$objectsDir/$effectiveTargetMachineTriple/libatomic/.libs"/libatomic.so* "$objectsDir/$effectiveTargetMachineTriple/libgcc"/libgcc_s.so* "$objectsDir/$effectiveTargetMachineTriple/libgfortran/.libs"/libgfortran.so* "$objectsDir/$effectiveTargetMachineTriple/libgomp/.libs"/libgomp.so* "$objectsDir/$effectiveTargetMachineTriple/libssp/.libs"/libssp.so* "$objectsDir/$effectiveTargetMachineTriple/libstdc++-v3/src/.libs"/libstdc++.so*; do
+			[ -e "$sharedLibrary" ] || continue
+			cp -a "$sharedLibrary" "$arm64RuntimeLibDir/"
+		done
+		ln -sfn libstdc++.so "$arm64RuntimeLibDir/libsupc++.so"
+		arm64RuntimeDevelopLibDir="$installDestDir$prefix/develop/lib"
+		mkdir -p "$arm64RuntimeDevelopLibDir"
+		for sharedLibrary in "$arm64RuntimeLibDir"/lib*.so*; do
+			[ -e "$sharedLibrary" ] || [ -L "$sharedLibrary" ] || continue
+			sharedLibraryName=$(basename "$sharedLibrary")
+			ln -sfn "../../lib/$sharedLibraryName" "$arm64RuntimeDevelopLibDir/$sharedLibraryName"
+		done
+		[ -e "$arm64RuntimeLibDir/libatomic.so" ] || { echo "ARM64 libatomic.so staging failed" >&2; exit 1; }
+	fi
+
+	if [ "$targetArchitecture" = "arm64" ]; then
+		arm64PackagePrefix="$installDestDir$prefix"
+		arm64GccBinDir="$arm64PackagePrefix/$relativeInstallDir/bin"
+		arm64GccHelperDir="$arm64PackagePrefix/$relativeInstallDir/$gccLibDir"
+		mkdir -p "$arm64GccBinDir" "$arm64GccHelperDir" "$arm64PackagePrefix/$relativeBinDir"
+		cp -af "$objectsDir/gcc/xgcc" "$arm64GccBinDir/gcc"
+		cp -af "$objectsDir/gcc/cpp" "$arm64GccBinDir/cpp"
+		for gccTool in gcc-ar gcc-nm gcc-ranlib gcov gcov-dump gcov-tool lto-dump; do
+			if [ -e "$objectsDir/gcc/$gccTool" ]; then
+				cp -af "$objectsDir/gcc/$gccTool" "$arm64GccBinDir/$gccTool"
+			fi
+		done
+		for gccHelper in cc1 cc1plus cc1obj collect2 lto1 lto-wrapper g++-mapper-server; do
+			if [ -e "$objectsDir/gcc/$gccHelper" ]; then
+				cp -af "$objectsDir/gcc/$gccHelper" "$arm64GccHelperDir/$gccHelper"
+			fi
+		done
+		mkdir -p "$arm64GccHelperDir/plugin"
+		cp -af "$objectsDir/lto-plugin/.libs/liblto_plugin.so" "$arm64GccHelperDir/plugin/liblto_plugin.so"
+		for gccLink in gcc g++ c++ cc cpp gcc-ar gcc-nm gcc-ranlib gcov gcov-dump gcov-tool lto-dump; do
+			ln -sfn "../develop/tools/bin/$gccLink" "$arm64PackagePrefix/$relativeBinDir/$gccLink"
+		done
+		ln -sfn gcc "$arm64GccBinDir/g++"
+		ln -sfn gcc "$arm64GccBinDir/c++"
+		ln -sfn gcc "$arm64GccBinDir/cc"
+		[ -e "$arm64GccBinDir/gcc" ] && [ -e "$arm64GccHelperDir/cc1" ] && [ -e "$arm64GccHelperDir/cc1plus" ] || { echo "ARM64 GCC core tools staging failed" >&2; exit 1; }
+	fi
+
+	packageEntries "syslibs" \
 		$relativeLibDir/libatomic.so \
 		$relativeLibDir/libatomic.so.$libatomicSoVersion \
 		$relativeLibDir/libatomic.so.$libatomicLibVersion \
@@ -655,10 +770,7 @@ INSTALL()
 		$relativeLibDir/libstdc++.so \
 		$relativeLibDir/libstdc++.so.$libstdcxxSoVersion \
 		$relativeLibDir/libstdc++.so.$libstdcxxLibVersion \
-		$relativeLibDir/libsupc++.so \
-		$relativeLibDir/libubsan.so \
-		$relativeLibDir/libubsan.so.$libubsanSoVersion \
-		$relativeLibDir/libubsan.so.$libubsanLibVersion
+		$relativeLibDir/libsupc++.so
 	if $targetHasLibquadmath; then
 		packageEntries "syslibs" \
 			$relativeLibDir/libquadmath.so \
@@ -666,19 +778,56 @@ INSTALL()
 			$relativeLibDir/libquadmath.so.$libquadmathLibVersion
 	fi
 
+	if [ "$targetArchitecture" = "arm64" ]; then
+		arm64RuntimeDevelopLibDir="$installDestDir$prefix/develop/lib"
+		mkdir -p "$arm64RuntimeDevelopLibDir"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libgcc/libgcc.a" "$arm64RuntimeDevelopLibDir/libgcc.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libgcc/libgcc-boot.a" "$arm64RuntimeDevelopLibDir/libgcc-boot.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libgcc/libgcc-kernel.a" "$arm64RuntimeDevelopLibDir/libgcc-kernel.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libgcc/libgcc_eh.a" "$arm64RuntimeDevelopLibDir/libgcc_eh.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libgcc/libgcc_eh-boot.a" "$arm64RuntimeDevelopLibDir/libgcc_eh-boot.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libgcc/libgcc_eh-kernel.a" "$arm64RuntimeDevelopLibDir/libgcc_eh-kernel.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libssp/.libs/libssp_nonshared.a" "$arm64RuntimeDevelopLibDir/libssp_nonshared.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libstdc++-v3/src/experimental/.libs/libstdc++exp.a" "$arm64RuntimeDevelopLibDir/libstdc++exp.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libstdc++-v3/libsupc++/.libs/libsupc++.a" "$arm64RuntimeDevelopLibDir/libsupc++.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libstdc++-v3/libsupc++/.libs/libsupc++-boot.a" "$arm64RuntimeDevelopLibDir/libsupc++-boot.a"
+		cp -f "$objectsDir/$effectiveTargetMachineTriple/libstdc++-v3/libsupc++/.libs/libsupc++-kernel.a" "$arm64RuntimeDevelopLibDir/libsupc++-kernel.a"
+	fi
+
+	if [ "$targetArchitecture" = "arm64" ]; then
+		arm64RuntimeHeaderDir="$installDestDir$prefix/develop/headers"
+		arm64GccHeaderDir="$arm64RuntimeHeaderDir/gcc"
+		arm64BuiltGccIncludeDir="$objectsDir/gcc/include"
+		arm64BuiltGccIncludeFixedDir="$objectsDir/gcc/include-fixed"
+		mkdir -p "$arm64GccHeaderDir/include" "$arm64GccHeaderDir/include-fixed"
+		if [ -d "$arm64BuiltGccIncludeDir" ]; then
+			cp -af "$arm64BuiltGccIncludeDir/." "$arm64GccHeaderDir/include/"
+		fi
+		if [ -d "$arm64BuiltGccIncludeFixedDir" ]; then
+			cp -af "$arm64BuiltGccIncludeFixedDir/." "$arm64GccHeaderDir/include-fixed/"
+		fi
+		if [ -d "$arm64GccHeaderDir/include/c++" ]; then
+			mv "$arm64GccHeaderDir/include/c++" "$arm64RuntimeHeaderDir/"
+		fi
+		if [ -d "$installDestDir$prefix/$relativeInstallDir/include/c++" ]; then
+			cp -af "$installDestDir$prefix/$relativeInstallDir/include/c++" "$arm64RuntimeHeaderDir/"
+		fi
+		[ -d "$arm64RuntimeHeaderDir/gcc" ] || { echo "ARM64 GCC headers staging failed" >&2; exit 1; }
+	fi
+
 	packageEntries "syslibs_devel" \
-		$developLibDir/*.so* \
-		$developLibDir/libgcc.a \
-		$developLibDir/libgcc-boot.a \
-		$developLibDir/libgcc-kernel.a \
-		$developLibDir/libgcc_eh.a \
-		$developLibDir/libgcc_eh-boot.a \
-		$developLibDir/libgcc_eh-kernel.a \
-		$developLibDir/libssp_nonshared.a \
-		$developLibDir/libstdc++exp.a \
-		$developLibDir/libsupc++.a \
-		$developLibDir/libsupc++-boot.a \
-		$developLibDir/libsupc++-kernel.a \
+		"$installDestDir$prefix/develop/lib"/*.so* \
+		develop/lib/libgcc.a \
+		develop/lib/libgcc-boot.a \
+		develop/lib/libgcc-kernel.a \
+		develop/lib/libgcc_eh.a \
+		develop/lib/libgcc_eh-boot.a \
+		develop/lib/libgcc_eh-kernel.a \
+		develop/lib/libssp_nonshared.a \
+		develop/lib/libstdc++exp.a \
+		develop/lib/libsupc++.a \
+		develop/lib/libsupc++-boot.a \
+		develop/lib/libsupc++-kernel.a \
 		$relativeIncludeDir
 
 	rm -rf $includeDir

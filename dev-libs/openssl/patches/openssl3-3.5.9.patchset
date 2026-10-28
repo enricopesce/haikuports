@@ -170,7 +170,7 @@ diff --git a/Configurations/50-haiku.conf b/Configurations/50-haiku.conf
 index 4580e71..c8c2805 100644
 --- a/Configurations/50-haiku.conf
 +++ b/Configurations/50-haiku.conf
-@@ -1,35 +1,31 @@
+@@ -1,35 +1,36 @@
  my %targets = (
      "haiku-common" => {
 +        inherit_from     => [ "BASE_unix" ],
@@ -210,6 +210,11 @@ index 4580e71..c8c2805 100644
          bn_ops           => "SIXTY_FOUR_BIT_LONG",
 +        asm_arch         => 'x86_64',
      },
++    "haiku-aarch64" => {
++        inherit_from     => [ "haiku-common" ],
++        bn_ops           => "SIXTY_FOUR_BIT_LONG",
++        asm_arch         => 'aarch64',
++    },
  );
 diff --git a/Configurations/shared-info.pl b/Configurations/shared-info.pl
 index caf6f90..96953f9 100644

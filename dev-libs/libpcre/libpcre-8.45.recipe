@@ -80,16 +80,17 @@ BUILD_PREREQUIRES="
 	"
 
 debugList=(
-	"$libDir"/libpcre.so.$libpcreVersion
-	"$libDir"/libpcrecpp.so.$libpcrecppVersion
-	"$libDir"/libpcreposix.so.$libpcreposixVersion
+	"$installDestDir$libDir"/libpcre.so.$libpcreVersion
+	"$installDestDir$libDir"/libpcrecpp.so.$libpcrecppVersion
+	"$installDestDir$libDir"/libpcreposix.so.$libpcreposixVersion
 	)
 if [ -z "$secondaryArchSuffix" ]; then
 for i in `echo "$PROVIDES" | sed -n -e \
 		"s/^[\t]*cmd:\(.*\)$secondaryArchSuffix =.*/\1/p;"`; do
-	debugList+=("$binDir"/$i)
+	debugList+=("$installDestDir$binDir"/$i)
 done
 fi
+if [ "$targetArchitecture" = arm64 ]; then debugInfoDir=$installDestDir$debugInfoDir; fi
 defineDebugInfoPackage libpcre$secondaryArchSuffix "${debugList[@]}"
 
 BUILD()
@@ -117,16 +118,16 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	make install DESTDIR="$installDestDir"
 
-	rm $libDir/libpcre*.la
+	rm -f "$installDestDir$libDir"/libpcre*.la
 
 	# prepare develop/lib
 	prepareInstalledDevelLibs $pcreLibs
 	fixPkgconfig
 
 	# fix pcre-config
-	fixDevelopLibDirReferences $binDir/pcre-config
+	fixDevelopLibDirReferences $installDestDir$binDir/pcre-config
 
 	if [ -n "$secondaryArchSuffix" ]; then
 		maybe_manDir_man1_pcre_config=
@@ -139,10 +140,10 @@ INSTALL()
 
 	# devel package
 	packageEntries devel \
-		$binDir/pcre-config \
-		$developDir \
-		$maybe_manDir_man1_pcre_config \
-		$maybe_manDir_man3
+		"$installDestDir$binDir/pcre-config" \
+		"$installDestDir$developDir" \
+		"$installDestDir$maybe_manDir_man1_pcre_config" \
+		"$installDestDir$maybe_manDir_man3"
 
 	if [ -n "$secondaryArchSuffix" ]; then
 	 	rm -rf $binDir

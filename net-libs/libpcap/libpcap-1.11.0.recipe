@@ -67,18 +67,30 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+	else
+		make install
+	fi
 
 	# remove static library
-	rm -f $libDir/libpcap.a
+	if [ "$targetArchitecture" = arm64 ]; then
+		rm -f "$installDestDir$libDir/libpcap.a"
+	else
+		rm -f $libDir/libpcap.a
+	fi
 
 	# prepare develop/lib
 	prepareInstalledDevelLib libpcap
 	fixPkgconfig
 
 	# devel package
-	packageEntries devel \
-		$developDir \
-		$manDir \
-		$prefix/bin/pcap-config
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel develop documentation/man bin/pcap-config
+	else
+		packageEntries devel \
+			$developDir \
+			$manDir \
+			$prefix/bin/pcap-config
+	fi
 }

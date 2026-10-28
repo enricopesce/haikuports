@@ -8650,7 +8650,7 @@ index cd8a9bf..9b9c65d 100644
  AM_CXXFLAGS += $(LIBSTDCXX_RAW_CXX_CXXFLAGS)
  AM_CXXFLAGS += -std=gnu++14
 -AM_CXXFLAGS += $(EXTRA_CXXFLAGS)
-+AM_CXXFLAGS += $(EXTRA_CXXFLAGS) -I /system/develop/headers/private -I /system/develop/headers/private/system/arch/x86_64 -I /system/develop/headers/private/system \
++AM_CXXFLAGS += $(EXTRA_CXXFLAGS)
  if LIBBACKTRACE_SUPPORTED
  AM_CXXFLAGS += -DSANITIZER_LIBBACKTRACE -DSANITIZER_CP_DEMANGLE \
  	       -I $(top_srcdir)/../libbacktrace \

@@ -101,6 +101,10 @@ PATCH()
 	if [ "$effectiveTargetArchitecture" = x86_gcc2 ]; then
 		sed -i 's/=stdc++/=stdc++.r4/' aclocal.m4 configure
 	fi
+	if [ "$targetArchitecture" = arm64 ]; then
+		# Haiku libc is provided by libroot.
+		sed -i s/,-stats,-lc/,-stats,-lroot/g configure
+	fi
 }
 
 BUILD()
@@ -109,10 +113,19 @@ BUILD()
 	# terminfo DB. The main package will depend on the primary package which
 	# provides all this.
 	local configureArgs
+	local savedCPATH="${CPATH:-}" savedLIBRARY_PATH="${LIBRARY_PATH:-}"
 	if [ -n "$secondaryArchSuffix" ]; then
 		configureArgs="--without-progs"
+	elif [ "$targetArchitecture" = arm64 ]; then
+		configureArgs="--with-build-cc=/usr/bin/gcc --without-libtool --with-shared --with-cxx-shared"
+		unset CPATH LIBRARY_PATH
+		BUILD_CC=/usr/bin/gcc
+		export BUILD_CC
 	fi
 
+	if [ "$targetArchitecture" = arm64 ]; then
+		sed -i s/,-stats,-lc/,-stats,-lroot/g configure
+	fi
 	runConfigure \
 		--omit-dirs "dataRootDir docDir" ./configure \
 		--disable-relink \
@@ -130,14 +143,27 @@ BUILD()
 		--with-pkg-config-libdir=$developLibDir/pkgconfig \
 		$configureArgs
 	make $jobArgs
+	if [ "$targetArchitecture" = arm64 ]; then
+		export CPATH="$savedCPATH" LIBRARY_PATH="$savedLIBRARY_PATH"
+		unset BUILD_CC
+	fi
 }
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install.libs install.includes
+		mkdir -p "$installDestDir$libDir" "$installDestDir$includeDir" "$installDestDir$developLibDir/pkgconfig"
+		cp -af "$sourceDir/lib/"*.so* "$installDestDir$libDir/"
+		cp -af "$sourceDir/include/." "$installDestDir$includeDir/"
+		ln -sfn curses.h "$installDestDir$includeDir/ncurses.h"
+		cp -af "$sourceDir/misc/"*.pc "$installDestDir$developLibDir/pkgconfig/"
+	else
+		make install
+	fi
 
 	# remove libtool files
-	rm $libDir/lib*.la
+	rm -f $libDir/lib*.la
 
 	# prepare develop/lib
 	prepareInstalledDevelLibs \
@@ -145,24 +171,39 @@ INSTALL()
 	fixPkgconfig
 
 	# fix ncursesw6-config
-	fixDevelopLibDirReferences $binDir/ncursesw6-config
+	if [ "$targetArchitecture" != arm64 ]; then
+		fixDevelopLibDirReferences $binDir/ncursesw6-config
+	fi
 
-	cd $developLibDir
+	if [ "$targetArchitecture" = arm64 ]; then
+		cd "$installDestDir$developLibDir"
+	else
+		cd $developLibDir
+	fi
 	for lib in form menu ncurses ncurses++ panel; do
 		ln -sn lib${lib}w.so lib${lib}.so
 		ln -sn ${lib}w.pc pkgconfig/${lib}.pc
 	done
-	cd -; cd $libDir
+	cd -
+	if [ "$targetArchitecture" = arm64 ]; then
+		cd "$installDestDir$libDir"
+	else
+		cd $libDir
+	fi
 	for lib in form menu ncurses ncurses++ panel; do
 		ln -sn lib${lib}w.so.6 lib${lib}.so.6
 	done
 	cd -
 
 	# devel package
-	packageEntries devel \
-		$binDir/ncursesw6-config \
-		$developDir \
-		$manDir/man3
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel $relativeDevelopDir
+	else
+		packageEntries devel \
+			$binDir/ncursesw6-config \
+			$developDir \
+			$manDir/man3
+	fi
 
 	# For the secondary architecture package clean up stuff we don't need, since
 	# we make it depend on the primary architecture package.

@@ -79,8 +79,8 @@ PATCH()
 
 BUILD()
 {
-	make -C lib BUILD_STATIC=no $jobArgs
-	make -C programs $jobArgs lz4 lz4c
+	make -C lib CC="$(getTargetArchitectureCommand gcc) --sysroot=$crossSysrootDir" BUILD_STATIC=no $jobArgs
+	make -C programs CC="$(getTargetArchitectureCommand gcc) --sysroot=$crossSysrootDir" $jobArgs lz4 lz4c
 }
 
 INSTALL()
@@ -90,6 +90,12 @@ INSTALL()
 		INCLUDEDIR="$includeDir" \
 		BINDIR="$binDir" \
 		MANDIR="$manDir"
+	if [ "$targetArchitecture" = "arm64" ]; then
+		arm64Stage="$installDestDir$prefix"
+		mkdir -p "$arm64Stage/$relativeLibDir" "$arm64Stage/$relativeIncludeDir"
+		cp -af "$sourceDir"/lib/liblz4.so* "$arm64Stage/$relativeLibDir/"
+		cp -af "$sourceDir"/lib/*.h "$arm64Stage/$relativeIncludeDir/"
+	fi
 
 	if [ -n "$secondaryArchSuffix" ]; then
 		rm -rf "$binDir"
@@ -103,7 +109,7 @@ INSTALL()
 	fixPkgconfig
 
 	packageEntries devel \
-		"$developDir"
+		"$relativeDevelopDir"
 }
 
 TEST()

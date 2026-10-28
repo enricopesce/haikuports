@@ -9,7 +9,7 @@ it can build LLVM, KDE, Blender, etc."
 HOMEPAGE="https://ninja-build.org/"
 COPYRIGHT="2012-2019 Google Inc."
 LICENSE="Apache v2"
-REVISION="3"
+REVISION="4"
 SOURCE_URI="https://github.com/ninja-build/ninja/archive/v$portVersion.tar.gz"
 CHECKSUM_SHA256="974d6b2f4eeefa25625d34da3cb36bdcebe7fbce40f4c16ac0835fd1c0cbae17"
 PATCHES="ninja-$portVersion.patchset"
@@ -51,17 +51,42 @@ REQUIRES_zsh="
 
 BUILD()
 {
-	python3 ./configure.py --bootstrap
+	if [ "$targetArchitecture" = arm64 ]; then
+		# Build a temporary native Ninja to run the generated ARM64 build.ninja.
+		mkdir -p "$sourceDir/host-bootstrap"
+		(cd "$sourceDir/host-bootstrap" && env -u LIBRARY_PATH -u CPATH -u CFLAGS -u CXXFLAGS -u LDFLAGS CC=/usr/bin/cc CXX=/usr/bin/c++ python3 "$sourceDir/configure.py" --bootstrap)
+		cp "$sourceDir/host-bootstrap/ninja" "$sourceDir/ninja-host"
+		local targetCXX="$(getTargetArchitectureCommand g++) --sysroot=$crossSysrootDir"
+		python3 - "$sourceDir/src/util.cc" <<'PY'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1])
+s = p.read_text()
+old = "\n#else\ndouble GetLoadAverage() {\n  double loadavg"
+new = "\n#elif defined(__HAIKU__)\ndouble GetLoadAverage() {\n  return -0.0f;\n}\n#else\ndouble GetLoadAverage() {\n  double loadavg"
+assert old in s, "Haiku GetLoadAverage fallback anchor missing"
+p.write_text(s.replace(old, new, 1))
+PY
+		CXX="$targetCXX" python3 ./configure.py --platform=haiku
+		"$sourceDir/ninja-host" -C "$sourceDir" -j "$jobs"
+	else
+		python3 ./configure.py --bootstrap
+	fi
 }
 
 INSTALL()
 {
-	mkdir $commandBinDir
-	cp ninja $commandBinDir
-	strip $commandBinDir/ninja
+	local stagedBinDir="$installDestDir$commandBinDir"
+	mkdir -p "$stagedBinDir"
+	cp "$sourceDir/ninja" "$stagedBinDir/ninja"
+	if [ "$targetArchitecture" = arm64 ]; then
+		"$(getTargetArchitectureCommand strip)" "$stagedBinDir/ninja"
+	else
+		strip "$stagedBinDir/ninja"
+	fi
 
 	# build our zsh completion package
-	mkdir -p $dataDir/zsh/site-functions
-	cp -af $sourceDir/misc/zsh-completion $dataDir/zsh/site-functions/_ninja
-	packageEntries zsh $dataDir
+	local stagedDataDir="$installDestDir$dataDir"
+	mkdir -p "$stagedDataDir/zsh/site-functions"
+	cp -af "$sourceDir/misc/zsh-completion" "$stagedDataDir/zsh/site-functions/_ninja"
+	packageEntries zsh "$stagedDataDir"
 }

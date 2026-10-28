@@ -46,13 +46,14 @@ BUILD_REQUIRES="
 BUILD_PREREQUIRES="
 	cmd:autoreconf
 	cmd:gcc$secondaryArchSuffix
-	cmd:gperf
 	cmd:libtoolize$secondaryArchSuffix
 	cmd:make
 	"
 
-defineDebugInfoPackage libunistring$secondaryArchSuffix \
-	"$libDir"/libunistring.so.$libVersion
+if [ "$targetArchitecture" != arm64 ]; then
+	defineDebugInfoPackage libunistring$secondaryArchSuffix \
+		"$libDir"/libunistring.so.$libVersion
+fi
 
 BUILD()
 {
@@ -67,14 +68,26 @@ INSTALL()
 	make install
 	rm -f "$libDir"/libunistring.la "$libDir"/charset.alias
 
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir"
+		cp -af "$sourceDir/lib/.libs/"libunistring.so* "$installDestDir$libDir/"
+		mkdir -p "$installDestDir$includeDir/unistring"
+		for header in unitypes.h unistr.h uniconv.h unistdio.h uniname.h unictype.h uniwidth.h unigbrk.h uniwbrk.h unilbrk.h unimetadata.h uninorm.h unicase.h; do
+			cp -f "$sourceDir/lib/$header" "$installDestDir$includeDir/$header"
+		done
+		for header in inline.h stdint.h localcharset.h iconveh.h version.h cdefs.h woe32dll.h; do
+			cp -f "$sourceDir/lib/unistring/$header" "$installDestDir$includeDir/unistring/$header"
+		done
+	fi
 	prepareInstalledDevelLib libunistring
 
-	packageEntries doc \
-		$developDir/documentation
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel $relativeDevelopDir
+	else
+		packageEntries doc $developDir/documentation
 
-	packageEntries devel \
-		$developDir \
-		$infoDir
+		packageEntries devel $developDir $infoDir
+	fi
 }
 
 TEST()

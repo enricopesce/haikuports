@@ -100,6 +100,14 @@ INSTALL()
 {
 	make install
 
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir/pkgconfig" "$installDestDir$includeDir" "$installDestDir$binDir"
+		cp -af "$sourceDir/.libs/"libpcre2*.so* "$installDestDir$libDir/"
+		cp -f "$sourceDir/src/pcre2.h" "$sourceDir/src/pcre2posix.h" "$installDestDir$includeDir/"
+		cp -f "$sourceDir/"libpcre2*.pc "$installDestDir$libDir/pkgconfig/"
+		cp -f "$sourceDir/pcre2-config" "$installDestDir$binDir/"
+	fi
+
 	# remove libtool files
 	rm -f "$libDir"/libpcre2-*.la
 
@@ -124,11 +132,11 @@ INSTALL()
 	fi
 
 	# devel package
-	packageEntries devel \
-		"$binDir"/pcre2-config \
-		"$developDir" \
-		${maybe_manDir_man1_pcre2_config:+"$maybe_manDir_man1_pcre2_config"} \
-		${maybe_manDir_man3:+"$maybe_manDir_man3"}
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel "$relativeBinDir/pcre2-config" "$relativeDevelopDir"
+	else
+		packageEntries devel "$binDir/pcre2-config" "$developDir" ${maybe_manDir_man1_pcre2_config:+"$maybe_manDir_man1_pcre2_config"} ${maybe_manDir_man3:+"$maybe_manDir_man3"}
+	fi
 }
 
 TEST()

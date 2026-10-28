@@ -49,8 +49,8 @@ CHECKSUM_SHA256_2="1e08bfafa442260ccabf9a872d4eab12de813d42b90769df056bab032b37e
 SOURCE_DIR="icu"
 PATCHES="icu77-$portVersion.patchset"
 
-ARCHITECTURES="?all !x86_gcc2"
-SECONDARY_ARCHITECTURES="?x86"
+ARCHITECTURES="all !x86_gcc2"
+SECONDARY_ARCHITECTURES="x86"
 
 libVersion="$portVersion"
 libVersionCompat="$libVersion compat >= ${libVersion%.*}"
@@ -160,8 +160,17 @@ BUILD()
 	unzip -oq ../../../sources-2/icu4c-*-data.zip
 	rm -f data/in/icudt??l.dat
 
-	autoconf
-	runConfigure ./configure \
+	if [ "$targetArchitecture" != arm64 ]; then
+		autoconf
+	fi
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p host-build
+		(cd host-build && env -u CPATH -u LIBRARY_PATH -u C_INCLUDE_PATH -u CPLUS_INCLUDE_PATH CC=gcc CXX=g++ CFLAGS="-O2" CXXFLAGS="-O2" LDFLAGS= ../configure \
+			--disable-samples --disable-extras --with-data-packaging=archive)
+		env -u CPATH -u LIBRARY_PATH -u C_INCLUDE_PATH -u CPLUS_INCLUDE_PATH make -C host-build $jobArgs
+		crossBuildArgs="--with-cross-build=$sourceDir/source/host-build"
+	fi
+	runConfigure ./configure $crossBuildArgs \
 		--disable-samples --disable-extras --with-data-packaging=archive
 	make $jobArgs
 }
@@ -170,6 +179,15 @@ INSTALL()
 {
 	cd source
 	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir"
+		find . -path "./host-build/*" -prune -o -name "libicu*.so*" -exec cp -af {} "$installDestDir$libDir/" \;
+		mkdir -p "$installDestDir$libDir/icu"
+		cp -f data/out/icudt77l.dat "$installDestDir$libDir/icu/"
+		mkdir -p "$installDestDir$binDir" "$installDestDir$manDir/man1"
+		cp -f config/icu-config "$installDestDir$binDir/"
+		cp -f config/icu-config.1 "$installDestDir$manDir/man1/"
+	fi
 
 	prepareInstalledDevelLibs \
 		libicudata \
@@ -186,16 +204,16 @@ INSTALL()
 
 	# devel package
 	packageEntries devel \
-		$developDir \
-		$libDir/icu \
-		$binDir/icu-config \
-		$manDir/man1/icu-config.1
+		$relativeDevelopDir \
+		$relativeLibDir/icu \
+		$relativeBinDir/icu-config \
+		$relativeManDir/man1/icu-config.1
 
 	# tools package
 	if [ -z "$secondaryArchSuffix" ]; then
 		packageEntries tools \
-			$binDir \
-			$manDir
+			$relativeBinDir \
+			$relativeManDir
 	else
 		rm -r $binDir $manDir
 	fi

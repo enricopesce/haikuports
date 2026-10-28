@@ -45,14 +45,24 @@ TEST_REQUIRES="
 
 BUILD()
 {
-	./configure --prefix=$prefix --mandir=$manDir
+	if [ "$targetArchitecture" = arm64 ]; then
+		unset CPATH LIBRARY_PATH
+		runConfigure --omit-dirs docDir ./configure --with-build-cc=cc --prefix=$prefix --mandir=$manDir
+	else
+		runConfigure --omit-dirs docDir ./configure --prefix=$prefix --mandir=$manDir
+	fi
 	make $jobArgs
 }
 
 INSTALL()
 {
-	make install
-	ln -s $binDir/mawk $binDir/awk
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+		ln -s mawk "$installDestDir$binDir/awk"
+	else
+		make install
+		ln -s $binDir/mawk $binDir/awk
+	fi
 }
 
 TEST()

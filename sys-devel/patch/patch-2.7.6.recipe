@@ -54,8 +54,20 @@ BUILD()
 
 INSTALL()
 {
-	make install
-	rm "$libDir"/charset.alias
+	local installPrefix="$prefix"
+	if [ "$targetArchitecture" = arm64 ]; then
+		installPrefix="$installDestDir$prefix"
+		make install prefix="$installPrefix" exec_prefix="$installPrefix" \
+			bindir="$installPrefix/bin" sbindir="$installPrefix/bin" \
+			libdir="$installPrefix/lib" includedir="$installPrefix/develop/headers" \
+			datarootdir="$installPrefix/data" datadir="$installPrefix/data" \
+			infodir="$installPrefix/documentation/info" \
+			mandir="$installPrefix/documentation/man" \
+			docdir="$installPrefix/documentation/packages/patch"
+	else
+		make install
+	fi
+	rm -f "$installPrefix"/lib/charset.alias
 }
 
 TEST()

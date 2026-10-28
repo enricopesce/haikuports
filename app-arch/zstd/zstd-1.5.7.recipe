@@ -122,7 +122,7 @@ TEST_REQUIRES="
 
 BUILD()
 {
-	make prefix="$prefix" \
+	make CC="$(getTargetArchitectureCommand gcc) --sysroot=$crossSysrootDir" LD="$(getTargetArchitectureCommand ld)" prefix="$prefix" \
 		includedir="$includeDir" \
 		libdir="$libDir" \
 		bindir="$binDir" \
@@ -140,6 +140,18 @@ INSTALL()
 		mandir="$manDir" \
 		"${zstdFeatures[@]}" \
 		install
+	if [ "$targetArchitecture" = "arm64" ]; then
+		arm64Stage="$installDestDir$prefix"
+		mkdir -p "$arm64Stage/$relativeLibDir" "$arm64Stage/$relativeIncludeDir" "$arm64Stage/$relativeDevelopLibDir/pkgconfig"
+		cp -af "$sourceDir"/lib/obj/conf_*/dynamic/libzstd.so.* "$arm64Stage/$relativeLibDir/"
+		ln -sf libzstd.so.1.5.7 "$arm64Stage/$relativeLibDir/libzstd.so.1"
+		ln -sf libzstd.so.1 "$arm64Stage/$relativeLibDir/libzstd.so"
+		cp -af "$sourceDir"/lib/*.h "$arm64Stage/$relativeIncludeDir/"
+		cp -af "$sourceDir/lib/libzstd.pc" "$arm64Stage/$relativeDevelopLibDir/pkgconfig/"
+		mkdir -p "$arm64Stage/$relativeBinDir" "$arm64Stage/$relativeDocDir"
+		cp -af "$sourceDir/programs/zstd" "$arm64Stage/$relativeBinDir/"
+		cp -af "$sourceDir/doc/zstd_manual.html" "$arm64Stage/$relativeDocDir/"
+	fi
 
 	mkdir -p $docDir
 	cp doc/zstd_manual.html $docDir
@@ -161,15 +173,23 @@ INSTALL()
 			> $developLibDir/cmake/zstd/$f.cmake
 	done
 
+	if [ "$targetArchitecture" = "arm64" ]; then
+		rm -rf "$(getPackagePrefix bin)/$relativeBinDir"
+		rm -rf "$(getPackagePrefix devel)/$relativeDevelopDir"
+	fi
+
 	packageEntries bin \
-		$commandBinDir \
-		$manDir/man1
+		$relativeBinDir
 
 	packageEntries devel \
-		$developDir \
-		$docDir/zstd_manual.html
+		$relativeDevelopDir \
+		$relativeDocDir/zstd_manual.html
 
-	rmdir $manDir
+	if [ "$targetArchitecture" = "arm64" ]; then
+		rm -rf "$manDir"
+	else
+		rmdir "$manDir"
+	fi
 
 	install -t $docDir -m 444 LICENSE
 }

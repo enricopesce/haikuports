@@ -7,7 +7,7 @@ of your choice."
 HOMEPAGE="https://cmake.org/"
 COPYRIGHT="2002-2026 Kitware, Inc., Insight Consortium"
 LICENSE="CMake"
-REVISION="1"
+REVISION="2"
 SOURCE_URI="https://cmake.org/files/v${portVersion%.*}/cmake-$portVersion.tar.gz"
 CHECKSUM_SHA256="bd24c30d80a7744ae84b845ff080cc8453b06c622ef01066564108e9cefc44cf"
 PATCHES="cmake-$portVersion.patchset"
@@ -30,6 +30,7 @@ REQUIRES="
 	lib:libcurl$secondaryArchSuffix
 	lib:libexpat$secondaryArchSuffix
 	lib:libiconv$secondaryArchSuffix
+	lib:libarchive$secondaryArchSuffix
 	lib:libncurses$secondaryArchSuffix
 	lib:librhash$secondaryArchSuffix
 	lib:libstdc++$secondaryArchSuffix
@@ -56,6 +57,7 @@ BUILD_REQUIRES="
 	devel:libncurses$secondaryArchSuffix
 	devel:librhash$secondaryArchSuffix
 	devel:libiconv$secondaryArchSuffix
+	devel:libarchive$secondaryArchSuffix
 	devel:libuv$secondaryArchSuffix
 	devel:libz$secondaryArchSuffix
 #	devel:nlohmann_json
@@ -82,41 +84,76 @@ BUILD_PREREQUIRES="
 	cmd:which
 	"
 
-defineDebugInfoPackage cmake$secondaryArchSuffix \
-	$prefix/bin/ccmake \
-	$prefix/bin/cmake \
-	$prefix/bin/cpack \
-	$prefix/bin/ctest
+defineDebugInfoPackage --directory "$installDestDir$developDir/debug" cmake$secondaryArchSuffix \
+	"$installDestDir$prefix/bin/ccmake" \
+	"$installDestDir$prefix/bin/cmake" \
+	"$installDestDir$prefix/bin/cpack" \
+	"$installDestDir$prefix/bin/ctest"
 
 BUILD()
 {
 	export LDFLAGS="-lbsd"
 
-	# not an autotools configure
-	# --system-libs doesn't allow --no-system-* overrides
-	./configure --prefix=$prefix \
-		--datadir=/$relativeDataDir/cmake \
-		--docdir=/$relativeDocDir \
-		--mandir=/$relativeManDir \
-		--xdgdatadir=/$relativeDataDir \
-		--no-system-libs \
-		--system-curl \
-		--system-expat \
-		--system-librhash \
-		--system-libuv \
-		--system-zlib \
-		--bootstrap-system-libuv \
-		--bootstrap-system-librhash \
-		--parallel=${jobArgs#-j}
-		# These do not seem to be used anyway (libarchive at least links to libz/libzstd):
-		# --system-bzip2 --system-liblzma --system-zstd, --system-nghttp2
-
-	make $jobArgs
+	if [ "$targetArchitecture" = "arm64" ]; then
+		local buildDir="$sourceDir/arm64-build"
+		# CMake expects the legacy Haiku include alias, while the sysroot stores OS.h under os/kernel.
+		mkdir -p "$crossSysrootDir/boot/system/develop/headers/be/kernel"
+		ln -sf ../../os/kernel/OS.h "$crossSysrootDir/boot/system/develop/headers/be/kernel/OS.h"
+		/usr/bin/cmake -S "$sourceDir" -B "$buildDir" -G "Unix Makefiles" \
+			-DCMAKE_SYSTEM_NAME=Haiku \
+			-DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+			-DCMAKE_C_COMPILER=/work/toolchain/cross-tools-arm64/bin/aarch64-unknown-haiku-gcc \
+			-DCMAKE_CXX_COMPILER=/work/toolchain/cross-tools-arm64/bin/aarch64-unknown-haiku-g++ \
+			-DCMAKE_SYSROOT="$crossSysrootDir" \
+			-DCMAKE_FIND_ROOT_PATH="$crossSysrootDir" \
+			-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+			-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+			-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+			-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+			-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+			-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+			-DCMAKE_INSTALL_PREFIX="$prefix" \
+			-DCMAKE_INSTALL_DATADIR="$relativeDataDir/cmake" \
+			-DCMAKE_INSTALL_DOCDIR="$relativeDocDir" \
+			-DCMAKE_INSTALL_MANDIR="$relativeManDir" \
+			-DCMAKE_INSTALL_XDGDATADIR="$relativeDataDir" \
+			-DCMAKE_USE_SYSTEM_LIBRARIES=OFF \
+			-DCMAKE_USE_SYSTEM_LIBRARY_CURL=ON \
+			-DCMAKE_USE_SYSTEM_LIBRARY_EXPAT=ON \
+			-DCMAKE_USE_SYSTEM_LIBRARY_LIBRHASH=ON \
+			-DCMAKE_USE_SYSTEM_LIBRARY_LIBUV=ON \
+			-DCMAKE_USE_SYSTEM_LIBRARY_ZLIB=ON \
+			-DCMAKE_USE_SYSTEM_LIBRARY_LIBARCHIVE=ON \
+			-DLIBMD_FOUND=OFF -DBUILD_TESTING=OFF
+		/usr/bin/cmake --build "$buildDir" --parallel "${jobs}"
+	else
+		# not an autotools configure
+		# --system-libs doesn't allow --no-system-* overrides
+		./configure --prefix=$prefix \
+			--datadir=/$relativeDataDir/cmake \
+			--docdir=/$relativeDocDir \
+			--mandir=/$relativeManDir \
+			--xdgdatadir=/$relativeDataDir \
+			--no-system-libs \
+			--system-curl \
+			--system-expat \
+			--system-librhash \
+			--system-libuv \
+			--system-zlib \
+			--bootstrap-system-libuv \
+			--bootstrap-system-librhash \
+			--parallel=${jobArgs#-j}
+		make $jobArgs
+	fi
 }
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = "arm64" ]; then
+		DESTDIR="$installDestDir" /usr/bin/cmake --install "$sourceDir/arm64-build" --prefix "$prefix"
+	else
+		make install
+	fi
 }
 
 # For reference: version 3.30.3

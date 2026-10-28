@@ -98,14 +98,33 @@ BUILD_PREREQUIRES="
 	cmd:pkg_config$secondaryArchSuffix
 	"
 
-defineDebugInfoPackage libjpeg_turbo$secondaryArchSuffix \
-	$libDir/libjpeg.so.$libjpegVersion \
-	$libDir/libturbojpeg.so.$libturbojpegVersion
+if [ "$targetArchitecture" != arm64 ]; then
+	defineDebugInfoPackage libjpeg_turbo$secondaryArchSuffix \
+		$libDir/libjpeg.so.$libjpegVersion \
+		$libDir/libturbojpeg.so.$libturbojpegVersion
+fi
 
 BUILD()
 {
+	local crossCMakeArgs=""
+	local cmakeBuildType=RelWithDebInfo
+	if [ "$targetArchitecture" = arm64 ]; then
+		cmakeBuildType=Release
+		cat > arm64-toolchain.cmake <<EOF
+set(CMAKE_SYSTEM_NAME Haiku)
+set(CMAKE_SYSTEM_PROCESSOR aarch64)
+set(CMAKE_C_COMPILER $targetMachineTriple-gcc)
+set(CMAKE_CXX_COMPILER $targetMachineTriple-g++)
+set(CMAKE_SYSROOT $crossSysrootDir)
+set(CMAKE_FIND_ROOT_PATH $crossSysrootDir)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+EOF
+		crossCMakeArgs="-DCMAKE_TOOLCHAIN_FILE=$PWD/arm64-toolchain.cmake"
+	fi
 	cmake -S. -Bbuild \
-		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		$crossCMakeArgs \
+		-DCMAKE_BUILD_TYPE=$cmakeBuildType \
 		-DCMAKE_INSTALL_PREFIX=$prefix \
 		-DCMAKE_INSTALL_BINDIR=$binDir  \
 		-DCMAKE_INSTALL_DATAROOTDIR=$dataDir \
@@ -119,20 +138,36 @@ BUILD()
 
 INSTALL()
 {
-	make -C build install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make -C build install DESTDIR="$installDestDir"
+	else
+		make -C build install
+	fi
 
 	prepareInstalledDevelLibs libjpeg libturbojpeg
 	fixPkgconfig
 
 	# devel package
-	packageEntries devel \
-		$developDir \
-		$libDir/cmake
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel \
+			develop \
+			lib/cmake
+	else
+		packageEntries devel \
+			$developDir \
+			$libDir/cmake
+	fi
 
 	# tools package
-	packageEntries tools \
-		$binDir \
-		$documentationDir
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries tools \
+			bin \
+			documentation
+	else
+		packageEntries tools \
+			$binDir \
+			$documentationDir
+	fi
 }
 
 TEST()

@@ -128,7 +128,6 @@ BUILD_PREREQUIRES="
 	cmd:automake
 	cmd:autoheader
 	cmd:gcc$secondaryArchSuffix
-	cmd:groff
 	cmd:gzip
 	cmd:ld$secondaryArchSuffix
 	cmd:libtoolize$secondaryArchSuffix
@@ -138,6 +137,13 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		CC="/work/toolchain/host-gcc-arm64/bin/aarch64-unknown-haiku-gcc --sysroot=$crossSysrootDir"
+		CXX="/work/toolchain/host-gcc-arm64/bin/aarch64-unknown-haiku-g++ --sysroot=$crossSysrootDir"
+		CPPFLAGS="-I$crossSysrootDir/boot/system/develop/headers -I$crossSysrootDir/boot/system/develop/headers/posix ${CPPFLAGS:-}"
+		LDFLAGS="${LDFLAGS:-} -L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib"
+		export CC CXX CPPFLAGS LDFLAGS
+	fi
 	runConfigure --omit-dirs docDir ./configure \
 		--docdir=$documentationDir/packages/gettext \
 		--disable-java \
@@ -145,7 +151,11 @@ BUILD()
 		--disable-rpath \
 		--disable-static \
 		--disable-maintainer-mode
-	make $jobArgs AUTOCONF=: AUTOMAKE=: AUTOHEADER=: ACLOCAL=:
+	if [ "$targetArchitecture" = arm64 ]; then
+		make -j1 AUTOCONF=: AUTOMAKE=: AUTOHEADER=: ACLOCAL=:
+	else
+		make $jobArgs AUTOCONF=: AUTOMAKE=: AUTOHEADER=: ACLOCAL=:
+	fi
 }
 
 INSTALL()
@@ -154,6 +164,14 @@ INSTALL()
 
 	# remove libtool files & static libraries
 	rm -f $libDir/lib*.la $libDir/lib*.a
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir"
+		mkdir -p "$installDestDir$includeDir"
+		mkdir -p "$installDestDir$prefix/$relativeDocumentationDir/packages"
+		cp -af "$sourceDir/gettext-runtime/intl/libintl.h" "$installDestDir$includeDir/"
+		find "$sourceDir" -name "lib*.so" -exec cp -af {} "$installDestDir$libDir/" \;
+		find "$sourceDir" -name "lib*.so.*" ! -name "*T" -exec cp -af {} "$installDestDir$libDir/" \;
+	fi
 
 	prepareInstalledDevelLibs \
 		libasprintf \
@@ -167,23 +185,22 @@ INSTALL()
 	prepareInstalledDevelLib libgettextlib '*.so' '*'
 	prepareInstalledDevelLib libgettextsrc '*.so' '*'
 
-	# libintl package
-	packageEntries libintl \
-		$libDir/libintl*
-
-	# libintl_devel package
-	packageEntries libintl_devel \
-		$developLibDir/*libintl* \
-		$includeDir/libintl.h
-
-	# devel package
-	packageEntries devel \
-		$developDir \
-		$manDir/man3
-
-	# documentation package
-	packageEntries doc \
-		$documentationDir/packages
+	# package splits
+	if [ "$targetArchitecture" = arm64 ]; then
+		for file in "$installDestDir$prefix/$relativeLibDir"/libintl*; do
+			packageEntries libintl "$file"
+		done
+		for file in "$installDestDir$prefix/$relativeDevelopLibDir"/*libintl* "$installDestDir$prefix/$relativeIncludeDir/libintl.h"; do
+			packageEntries libintl_devel "$file"
+		done
+		packageEntries devel $relativeDevelopDir
+		packageEntries doc $relativeDocumentationDir/packages
+	else
+		packageEntries libintl $libDir/libintl*
+		packageEntries libintl_devel $developLibDir/*libintl* $includeDir/libintl.h
+		packageEntries devel $developDir $manDir/man3
+		packageEntries doc $documentationDir/packages
+	fi
 
 	# cleanup
 #	rmdir $documentationDir/packages

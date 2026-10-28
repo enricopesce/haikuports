@@ -43,16 +43,39 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	cp makefile.haiku makefile.machine
+	if [ "$targetArchitecture" = arm64 ]; then
+		sed -i \
+			-e "s|^CC=gcc$|CC=$targetMachineTriple-gcc --sysroot=$crossSysrootDir|" \
+			-e "s|^CXX=g++$|CXX=$targetMachineTriple-g++ --sysroot=$crossSysrootDir|" \
+			makefile.machine
+	fi
+	if [ "$targetArchitecture" = arm64 ]; then
+		find . -type f \
+			\( -name *.cpp -o -name *.h \) \
+			-exec sed -i s@be/kernel/OS.h@kernel/OS.h@g {} +
+	fi
 	make $jobArgs 7z 7zr 7za
 }
 
 INSTALL()
 {
-	make install DEST_DIR="" DEST_HOME=$prefix DEST_SHARE_DOC=$docDir \
-		DEST_MAN=$manDir
-
-	expanderRulesDir=$dataDir/expander/rules
-	mkdir -p $expanderRulesDir
-	cp "$portDir/additional-files/p7zip-expander-rules" \
-		"$expanderRulesDir/p7zip"
+	if [ "$targetArchitecture" = arm64 ]; then
+		local stagePrefix="$installDestDir$prefix"
+		local stageDocDir="$stagePrefix/documentation/packages/p7zip"
+		local stageManDir="$stagePrefix/documentation/man"
+		mkdir -p "$stagePrefix/bin" "$stageDocDir" \
+			"$stageManDir/man1" "$installDestDir$dataDir/expander/rules"
+		cp bin/7z bin/7za bin/7zr "$stagePrefix/bin/"
+		cp DOC/7zC.txt DOC/Methods.txt "$stageDocDir/" 2>/dev/null || true
+		cp man1/*.1 "$stageManDir/man1/"
+		cp "$portDir/additional-files/p7zip-expander-rules" \
+			"$installDestDir$dataDir/expander/rules/p7zip"
+	else
+		make install DEST_DIR="" DEST_HOME=$prefix DEST_SHARE_DOC=$docDir \
+			DEST_MAN=$manDir
+		expanderRulesDir=$dataDir/expander/rules
+		mkdir -p $expanderRulesDir
+		cp "$portDir/additional-files/p7zip-expander-rules" \
+			"$expanderRulesDir/p7zip"
+	fi
 }

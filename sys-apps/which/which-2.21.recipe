@@ -30,8 +30,10 @@ BUILD_PREREQUIRES="
 	cmd:sed
 	"
 
+if [ "$targetArchitecture" != arm64 ]; then
 defineDebugInfoPackage which \
 	$binDir/which
+fi
 
 BUILD()
 {
@@ -41,5 +43,9 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+	else
+		make install
+	fi
 }

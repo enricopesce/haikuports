@@ -20,12 +20,12 @@ HOMEPAGE="https://sourceware.org/gdb/"
 COPYRIGHT="2024-2025 Free Software Foundation, Inc."
 LICENSE="GNU GPL v2
 	GNU GPL v3"
-REVISION="1"
+REVISION="2"
 SOURCE_URI="https://ftp.gnu.org/gnu/gdb/gdb-$portVersion.tar.xz"
 CHECKSUM_SHA256="1c036c0d72e4b3d1fb5c94c88632add6f9d76f4d7c4d2ea793c12a9f19a3228c"
 PATCHES="gdb-$portVersion.patchset"
 
-ARCHITECTURES="x86_64 ?x86 !x86_gcc2"
+ARCHITECTURES="x86_64 ?x86 arm64 !x86_gcc2"
 
 binutilsVersion="2.45"
 
@@ -52,10 +52,14 @@ REQUIRES="
 	lib:libncurses
 	lib:libpython3.10
 	lib:libreadline
-	lib:libsource_highlight
 	lib:libxxhash
 	lib:libz
 	"
+if [ "$targetArchitecture" != "arm64" ]; then
+	REQUIRES+="
+	lib:libsource_highlight
+	"
+fi
 
 BUILD_REQUIRES="
 	devel:libexpat
@@ -66,10 +70,14 @@ BUILD_REQUIRES="
 	devel:libncurses
 	devel:libpython3.10
 	devel:libreadline
-	devel:libsource_highlight
 	devel:libxxhash
 	devel:libz
 	"
+if [ "$targetArchitecture" != "arm64" ]; then
+	BUILD_REQUIRES+="
+	devel:libsource_highlight
+	"
+fi
 BUILD_PREREQUIRES="
 	haiku_devel
 	cmd:awk
@@ -98,31 +106,46 @@ BUILD()
 	rm -f bfd/bfdver.h
 	mkdir -p build && cd build
 
+	local sourceHighlightFlag=--enable-source-highlight
+	local pythonFlag=--with-python=python3
+	if [ "$targetArchitecture" = "arm64" ]; then
+		sourceHighlightFlag=--disable-source-highlight
+		# The Python package currently stages libpython but not its headers into the ARM64 sysroot.
+		pythonFlag=--with-python=auto
+	fi
 	runConfigure --omit-dirs "docDir dataRootDir" ../configure \
 		--disable-nls \
-		--enable-source-highlight \
+		$sourceHighlightFlag \
 		--enable-tui \
 		--enable-languages=all \
 		--with-system-zlib --with-system-readline \
-		--with-python=python3
-	make $jobArgs
+		$pythonFlag
+	make CC_FOR_BUILD="env -u LIBRARY_PATH -u CPATH /usr/bin/gcc" CXX_FOR_BUILD="env -u LIBRARY_PATH -u CPATH /usr/bin/g++" $jobArgs
 }
 
 INSTALL()
 {
-	make -C build install
-
-	# symlink so that GDB could look for library .debuginfo files
-	ln -s $debugInfoDir $libDir/.debug
-
-	prepareInstalledDevelLibs \
-		libbfd \
-		libctf \
-		libctf-nobfd \
-		libopcodes \
-		libsframe
-
-	rm $developLibDir/*.la
+	if [ "$targetArchitecture" = arm64 ]; then
+		DESTDIR="$installDestDir" make -C build install
+		ln -s "$debugInfoDir" "$installDestDir$libDir/.debug"
+		prepareInstalledDevelLibs \
+			libbfd \
+			libctf \
+			libctf-nobfd \
+			libopcodes \
+			libsframe
+		rm -f "$installDestDir$developLibDir"/*.la
+	else
+		make -C build install
+		ln -s $debugInfoDir $libDir/.debug
+		prepareInstalledDevelLibs \
+			libbfd \
+			libctf \
+			libctf-nobfd \
+			libopcodes \
+			libsframe
+		rm $developLibDir/*.la
+	fi
 }
 
 TEST()

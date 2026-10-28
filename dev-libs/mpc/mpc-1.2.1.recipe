@@ -48,26 +48,35 @@ BUILD_PREREQUIRES="
 	cmd:make
 	"
 
-defineDebugInfoPackage mpc$secondaryArchSuffix \
-	$libDir/libmpc.so.$libVersion
+if [ "$isCrossRepository" != true ]; then
+	defineDebugInfoPackage mpc$secondaryArchSuffix \
+		$libDir/libmpc.so.$libVersion
+fi
 
 BUILD()
 {
-	runConfigure ./configure --disable-static
+	local crossArgs
+	if [ "$isCrossRepository" = true ]; then
+		crossArgs="--build=$buildMachineTriple --host=$targetMachineTriple"
+		export CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib"
+		export AR="$targetMachineTriple-ar"
+		export RANLIB="$targetMachineTriple-ranlib"
+	fi
+	runConfigure ./configure $crossArgs --disable-static
 	make $jobArgs
 }
 
 INSTALL()
 {
-	make install
-	rm $libDir/libmpc.la
+	make install DESTDIR=$installDestDir
+	rm $installDestDir$libDir/libmpc.la
 
 	if [ -n "$secondaryArchSuffix" ]; then
 		rm -rf $infoDir
 	fi
 
 	prepareInstalledDevelLib libmpc
-	packageEntries devel $developDir
+	packageEntries devel $installDestDir$developDir
 }
 
 TEST()

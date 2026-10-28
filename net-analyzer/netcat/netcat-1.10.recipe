@@ -32,11 +32,21 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	# make tries to static-link which obviously does not work
-	cc netcat.c -O -DHAIKU -lnetwork -o nc
+	local compiler=cc
+	local sysrootFlag=
+	if [ "$targetArchitecture" = arm64 ]; then
+		compiler="$targetMachineTriple-gcc"
+		sysrootFlag="--sysroot=$crossSysrootDir"
+	fi
+	$compiler $sysrootFlag netcat.c -O -DHAIKU -lnetwork -o nc
 }
 
 INSTALL()
 {
-	mkdir -p $binDir
-	cp nc $binDir
+	local installBinDir="$binDir"
+	if [ "$targetArchitecture" = arm64 ]; then
+		installBinDir="$installDestDir$binDir"
+	fi
+	mkdir -p "$installBinDir"
+	cp nc "$installBinDir"
 }

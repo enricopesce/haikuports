@@ -42,19 +42,35 @@ BUILD_PREREQUIRES="
 	cmd:make
 	"
 
+if [ "$targetArchitecture" != arm64 ]; then
 defineDebugInfoPackage jam \
 	"$binDir"/jam
+fi
 
 BUILD()
 {
-	DEBUG=1 OPTIM=-O2 make
+	if [ "$targetArchitecture" = arm64 ]; then
+		make jam0 CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir"
+		mkdir -p bin.haiku/g
+		cp jam0 bin.haiku/g/jam
+	else
+		DEBUG=1 OPTIM=-O2 make
+	fi
 }
 
 INSTALL()
 {
-	mkdir -pv "$binDir"
-	install -v bin.haiku*/g/jam "$binDir"
+	local installBinDir="$binDir"
+	if [ "$targetArchitecture" = arm64 ]; then
+		installBinDir="$installDestDir$binDir"
+	fi
+	mkdir -pv "$installBinDir"
+	install -v bin.haiku*/g/jam "$installBinDir"
 
-	mkdir -pv "$docDir"
-	cp -afv Jam.html Jambase.html Jamfile.html README* "$docDir"
+	local installDocDir="$docDir"
+	if [ "$targetArchitecture" = arm64 ]; then
+		installDocDir="$installDestDir$docDir"
+	fi
+	mkdir -pv "$installDocDir"
+	cp -afv Jam.html Jambase.html Jamfile.html README* "$installDocDir"
 }

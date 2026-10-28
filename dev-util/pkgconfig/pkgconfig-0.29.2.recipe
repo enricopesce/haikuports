@@ -46,6 +46,9 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	pcPathSubdir="/lib${secondaryArchSuffix/_//}/pkgconfig"
+	if [ "$isCrossRepository" = "true" ]; then
+		pcPath="$crossSysrootDir/boot/system/develop/lib/pkgconfig"
+	else
 	pcPath="`finddir B_USER_NONPACKAGED_DEVELOP_DIRECTORY`$pcPathSubdir"
 	pcPath="$pcPath:`finddir B_USER_DEVELOP_DIRECTORY`$pcPathSubdir"
 	pcPath="$pcPath:`finddir B_SYSTEM_NONPACKAGED_DEVELOP_DIRECTORY`$pcPathSubdir"
@@ -54,6 +57,7 @@ BUILD()
 	pcPath="$pcPath:`finddir B_USER_DATA_DIRECTORY`/pkgconfig"
 	pcPath="$pcPath:`finddir B_SYSTEM_NONPACKAGED_DATA_DIRECTORY`/pkgconfig"
 	pcPath="$pcPath:`finddir B_SYSTEM_DATA_DIRECTORY`/pkgconfig"
+	fi
 
 	# because we patched configure.ac...
 	cd glib

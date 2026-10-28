@@ -75,10 +75,14 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+	else
+		make install
+	fi
 
 	# remove libtool file
-	rm $libDir/libpng*.la
+	rm -f $libDir/libpng*.la
 
 	prepareInstalledDevelLibs libpng libpng16
 	fixPkgconfig
@@ -91,10 +95,17 @@ INSTALL()
 	fi
 
 	# devel package
-	packageEntries devel \
-		$binDir \
-		$developDir \
-		$maybe_manDir_man3
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel \
+			bin \
+			develop/headers \
+			documentation/man/man3
+	else
+		packageEntries devel \
+			$binDir \
+			$developDir \
+			$maybe_manDir_man3
+	fi
 }
 
 TEST()

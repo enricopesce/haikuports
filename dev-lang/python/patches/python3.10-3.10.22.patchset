@@ -1256,6 +1256,16 @@ index 8ac83da..765f004 100644
  	'')	MACHDEP="unknown";;
      esac
  fi
+@@ -454,5 +458,8 @@
+ 	*-*-vxworks*)
+ 		_host_cpu=$host_cpu
+ 		;;
++	*-*-haiku*)
++		_host_cpu=$host_cpu
++		;;
+ 	*)
+ 		# for now, limit cross builds to known configurations
+
 -- 
 2.54.0
 
@@ -1279,6 +1289,3 @@ index 35b9810..114d410 100644
  #undef  THREAD_STACK_SIZE
  #define THREAD_STACK_SIZE       0x400000
  #endif
--- 
-2.54.0
-

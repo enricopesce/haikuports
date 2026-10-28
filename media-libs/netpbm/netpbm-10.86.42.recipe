@@ -679,30 +679,44 @@ BUILD()
 	SHLIB_CLIB =
 	MATHLIB =
 	NETWORKLD = -lnetwork
+	CC_FOR_BUILD = /usr/bin/gcc
+	LD_FOR_BUILD = /usr/bin/gcc
+	CFLAGS_FOR_BUILD =
+	LDFLAGS_FOR_BUILD =
+	CC = aarch64-unknown-haiku-gcc
+	LD = aarch64-unknown-haiku-gcc
+	CFLAGS += -fPIC
 EOF
+	if [ "$targetArchitecture" = arm64 ]; then
+		env -u CPATH -u LIBRARY_PATH -u C_INCLUDE_PATH -u CPLUS_INCLUDE_PATH make -C buildtools all \
+			CC_FOR_BUILD=/usr/bin/gcc LD_FOR_BUILD=/usr/bin/gcc \
+			CFLAGS_FOR_BUILD= LDFLAGS_FOR_BUILD= CFLAGS= CADD= CFLAGS_PERSONAL=
+		env -u CPATH -u LIBRARY_PATH -u C_INCLUDE_PATH -u CPLUS_INCLUDE_PATH make -C test testrandom \
+			CC_FOR_BUILD=/usr/bin/gcc LD_FOR_BUILD=/usr/bin/gcc \
+			CFLAGS_FOR_BUILD= LDFLAGS_FOR_BUILD= CFLAGS= CADD= CFLAGS_PERSONAL=
+	fi
 	make $jobArgs
 }
 
 INSTALL()
 {
-	make package pkgdir=$prefix/temp
-	mkdir -p $dataDir $developLibDir/pkgconfig $includeDir $libDir $manDir/man1
-	mv $prefix/temp/bin $prefix/bin
-	mv $prefix/temp/lib/* $libDir
-	mv $prefix/temp/include/* $includeDir
-	rm $prefix/temp/{README,VERSION,config_template,pkgconfig_template,pkginfo}
-	mv $prefix/temp/misc $dataDir/netpbm
-	cp doc/*.1 $manDir/man1
-	rm -r $prefix/temp
-	ln -s libnetpbm.so.11 $libDir/libnetpbm.so
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageDir="$installDestDir$prefix"
+		tempDir="$packageDir/temp"
+		mkdir -p "$packageDir"
+		STRIPPROG=true make package pkgdir="$tempDir"
+		mkdir -p "$installDestDir$binDir" "$installDestDir$libDir" \
+			"$installDestDir$includeDir" "$installDestDir$dataDir" \
+			"$installDestDir$manDir/man1" "$installDestDir$developLibDir/pkgconfig"
+		mv "$tempDir/bin" "$installDestDir$binDir"
+		mv "$tempDir/lib/"* "$installDestDir$libDir/"
+		mv "$tempDir/include/"* "$installDestDir$includeDir/"
+		mv "$tempDir/misc" "$installDestDir$dataDir/netpbm"
+		cp doc/*.1 "$installDestDir$manDir/man1/"
+		rm -rf "$tempDir"
+		ln -sf libnetpbm.so.11 "$installDestDir$libDir/libnetpbm.so"
 
-if [ -n "$secondaryArchSuffix" ]; then
-	rm -rf $prefix/bin
-	rm -rf $dataDir
-	rm -rf $manDir
-fi
-
-	cat > $developLibDir/pkgconfig/netpbm.pc << EOF
+		cat > "$installDestDir$developLibDir/pkgconfig/netpbm.pc" << EOF
 libdir=$libDir
 includedir=$includeDir
 
@@ -712,11 +726,40 @@ Version: $portVersion
 Libs: -L\${libdir} -lnetpbm
 Cflags: -I\${includedir}/netpbm
 EOF
+		prepareInstalledDevelLib libnetpbm
+		fixPkgconfig
+		packageEntries devel "$relativeDevelopDir"
+	else
+		make package pkgdir=$prefix/temp
+		mkdir -p $dataDir $developLibDir/pkgconfig $includeDir $libDir $manDir/man1
+		mv $prefix/temp/bin $prefix/bin
+		mv $prefix/temp/lib/* $libDir
+		mv $prefix/temp/include/* $includeDir
+		rm $prefix/temp/{README,VERSION,config_template,pkgconfig_template,pkginfo}
+		mv $prefix/temp/misc $dataDir/netpbm
+		cp doc/*.1 $manDir/man1
+		rm -r $prefix/temp
+		ln -s libnetpbm.so.11 $libDir/libnetpbm.so
 
-	prepareInstalledDevelLib libnetpbm
-	fixPkgconfig
+		if [ -n "$secondaryArchSuffix" ]; then
+			rm -rf $prefix/bin
+			rm -rf $dataDir
+			rm -rf $manDir
+		fi
 
-	# devel package
-	packageEntries devel \
-		$developDir
+		cat > $developLibDir/pkgconfig/netpbm.pc << EOF
+libdir=$libDir
+includedir=$includeDir
+
+Name: Netpbm
+Description: Graphics utilities
+Version: $portVersion
+Libs: -L\${libdir} -lnetpbm
+Cflags: -I\${includedir}/netpbm
+EOF
+		prepareInstalledDevelLib libnetpbm
+		fixPkgconfig
+		packageEntries devel \
+			$developDir
+	fi
 }

@@ -59,8 +59,6 @@ REQUIRES="
 
 BUILD_REQUIRES="
 	haiku${secondaryArchSuffix}_devel
-	cmd:find
-	cmd:xargs
 	"
 BUILD_PREREQUIRES="
 	cmd:autoconf
@@ -92,22 +90,26 @@ BUILD()
 	cd $objectsDir
 
 	binUtilsTargets=$effectiveTargetMachineTriple
-
 	if [ $effectiveTargetArchitecture == x86_64 ]; then
 		binUtilsTargets="$binUtilsTargets,i386-efi-pe,x86_64-efi-pe"
 	fi
 
-	CFLAGS=-O2 CXXFLAGS=-O2 runConfigure "$sourceDir/configure" \
+	local crossArgs
+	if [ "$isCrossRepository" = true ]; then
+		crossArgs="--build=$buildMachineTriple --host=$targetMachineTriple --target=$targetMachineTriple"
+		export CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib"
+		export CXX="$targetMachineTriple-g++ -L$crossSysrootDir/boot/system/develop/lib"
+		export AR="$targetMachineTriple-ar"
+		export RANLIB="$targetMachineTriple-ranlib"
+	fi
+
+	CFLAGS=-O2 CXXFLAGS=-O2 runConfigure "$sourceDir/configure" $crossArgs \
 		--exec-prefix=$installDir \
 		--includedir=$includeDir/binutils \
 		--docdir=$docDir --enable-host-shared --enable-largefile=yes \
 		--disable-libtool-lock --disable-nls --enable-plugins --enable-64-bit-bfd \
 		--enable-ld=default --enable-targets=$binUtilsTargets \
 		--with-sysroot=/ --enable-default-execstack=no
-		# Note: The sysroot option is normally superfluous. We have to specify
-		# it, however, since these binutils may be used by the bootstrap-gcc,
-		# which passes --sysroot=<path> to ld.
-
 	make $jobArgs LEXLIB=
 }
 
@@ -115,17 +117,17 @@ INSTALL()
 {
 	cd $objectsDir
 
-	make install
-	make install-html
+	make install DESTDIR=$installDestDir
+	make install-html DESTDIR=$installDestDir
 
 	# Remove the development libraries and headers. Nobody uses those anyway.
-	rm $libDir/*.a $libDir/*.la
-	rm -r $developDir/headers
+	rm -f $installDestDir$libDir/*.a $installDestDir$libDir/*.la
+	rm -rf $installDestDir$developDir/headers
 
 	### HTML documentation ####################################
 
-	echo "Organizing HTML documentation..."
-	cd $docDir
+	echo "Organizing HTML docs"
+	cd $installDestDir$docDir
 
 	# beautify HTML docs and remove stuff we don't need
 	mv as.html as
@@ -138,40 +140,28 @@ INSTALL()
 	ln -sf gprof/index.html gprof.html
 	mv ld.html ld
 	ln -sf ld/index.html ld.html
-	rm libiberty.html
+	rm -f libiberty.html
 
-	# no info documentation
-	rm -r $infoDir
+	### no info documentation ###############################
+	rm -rf $installDestDir$infoDir
 
 	### Strip #################################################
-
 	echo "Strip debug info"
-
-	strip --strip-debug $binDir/*
+	$targetMachineTriple-strip --strip-debug $installDestDir$binDir/*
 
 	### Symlinks ##############################################
-
 	echo "Creating required symlinks"
-
-	# There are copies of a subset of the commands below installDir. We
-	# overwrite those with symlinks to the ones in binDir.
-	for file in $installDir/$effectiveTargetMachineTriple/bin/*; do
-		symlinkRelative -sfn $binDir/$(basename $file) $file
+	for file in $installDestDir$installDir/$effectiveTargetMachineTriple/bin/*; do
+		symlinkRelative -sfn $installDestDir$binDir/$(basename $file) $file
 	done
 
 	### Cleanup #################################################
-
 	echo "Cleanup"
-
-	# delete commands we aren't including
-	cd $binDir
+	cd $installDestDir$binDir
 	for cmd in dlltool dllwrap windmc windres; do
-		rm -f $cmd
-		rm -f $installDir/$effectiveTargetMachineTriple/bin/$cmd
+		rm -f $cmd $installDestDir$installDir/$effectiveTargetMachineTriple/bin/$cmd
 	done
-
-	# delete man pages for commands that we aren't including
-	cd $manDir
+	cd $installDestDir$manDir
 	for cmd in dlltool nlmconv windmc windres; do
 		rm -f man1/$cmd.1
 	done

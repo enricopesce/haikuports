@@ -61,6 +61,8 @@ TEST_REQUIRES="
 BUILD()
 {
 	cmake -Bbuild -S. -DCMAKE_BUILD_TYPE=Release \
+		$([ "$targetArchitecture" = arm64 ] && echo -DCMAKE_C_COMPILER=aarch64-unknown-haiku-gcc -DCMAKE_CXX_COMPILER=aarch64-unknown-haiku-g++) \
+		$([ "$targetArchitecture" = arm64 ] && echo -DIconv_LIBRARY=$crossSysrootDir/boot/system/develop/lib/libiconv.so -DIconv_INCLUDE_DIR=$crossSysrootDir/boot/system/develop/headers) \
 		$cmakeDirArgs \
 		-DCMAKE_INSTALL_BINDIR=$prefix/bin \
 		-Dbuild_wizard=OFF
@@ -70,6 +72,11 @@ BUILD()
 INSTALL()
 {
 	make -Cbuild install
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$binDir" "$installDestDir$manDir/man1"
+		cp -f "$sourceDir/build/bin/doxygen" "$installDestDir$binDir/"
+		cp -f "$sourceDir/build/man/doxygen.1" "$installDestDir$manDir/man1/"
+	fi
 }
 
 TEST()

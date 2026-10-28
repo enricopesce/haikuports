@@ -33,11 +33,19 @@ BUILD()
 {
 	# These flags are used to choose gcc over Metrowerks PPC compiler,
 	# so they are needed everywhere but x86(-64).
-	make CPU=x86 NATIVE=x86 OBJ=obj
+	if [ "$targetArchitecture" = arm64 ]; then
+		make CPU=x86 NATIVE=x86 OBJ=obj CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir" LD="$targetMachineTriple-gcc --sysroot=$crossSysrootDir" MIMESET=true SHELL=/bin/bash
+	else
+		make CPU=x86 NATIVE=x86 OBJ=obj
+	fi
 }
 
 INSTALL()
 {
-	mkdir -p $binDir
-	cp -a obj/mkdepend $binDir
+	local installBinDir="$binDir"
+	if [ "$targetArchitecture" = arm64 ]; then
+		installBinDir="$installDestDir$binDir"
+	fi
+	mkdir -p "$installBinDir"
+	cp -a obj/mkdepend "$installBinDir"
 }

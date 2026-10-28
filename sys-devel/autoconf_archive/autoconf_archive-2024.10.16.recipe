@@ -29,6 +29,13 @@ BUILD_PREREQUIRES="
 	cmd:make
 	cmd:makeinfo >= 7
 	"
+if [ "$targetArchitecture" = arm64 ]; then
+	BUILD_PREREQUIRES="
+		cmd:awk
+		cmd:cmp
+		cmd:make
+		"
+fi
 
 BUILD()
 {
@@ -38,6 +45,10 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+	else
+		make install
+	fi
 	rm -f "$dataDir"/autoconf-archive/COPYING*
 }

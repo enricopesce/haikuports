@@ -237,6 +237,16 @@ fi
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		export PYTHON_FOR_BUILD="_PYTHON_PROJECT_BASE=$PWD _PYTHON_HOST_PLATFORM=haiku-aarch64 PYTHONPATH=/work/host-tools/Python-3.10.22/build/lib.linux-x86_64-3.10:$PWD/build/lib.haiku-aarch64-3.10:$PWD/Lib _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__haiku_ /work/host-tools/Python-3.10.22/python"
+		export ac_cv_buggy_getaddrinfo=no
+		export ac_cv_file__dev_ptmx=no
+		export ac_cv_file__dev_ptc=no
+	fi
+	# Make cross-sysroot autoconf-archive macros visible to host aclocal.
+	if [ "$targetArchitecture" = arm64 ]; then
+		export ACLOCAL_PATH="$crossSysrootDir/boot/system/data/aclocal:$ACLOCAL_PATH"
+	fi
 	autoupdate
 	autoreconf -fi
 
@@ -258,7 +268,12 @@ BUILD()
 
 	if $optimizedBuild; then
 		export OPT+=" -O3"
-		maybeEnableOptimizations="--enable-optimizations"
+		if [ "$targetArchitecture" = arm64 ]; then
+			# PGO cannot run target binary on Linux build host.
+			maybeEnableOptimizations=
+		else
+			maybeEnableOptimizations="--enable-optimizations"
+		fi
 	else
 		export OPT+=" -O0"
 		maybeEnableOptimizations=
@@ -290,6 +305,11 @@ INSTALL()
 	else
 		# altinstall avoids clobbering $prefix/bin/{idle3,pydoc3,python3,python3-config}
 		make altinstall
+	fi
+
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir"
+		cp -af "$sourceDir"/libpython$pyShortVer.so* "$installDestDir$libDir/"
 	fi
 
 	rm $libDir/libpython3.so

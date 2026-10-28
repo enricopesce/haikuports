@@ -130,7 +130,6 @@ REQUIRES_perl="
 	haiku$secondaryArchSuffix
 	git$secondaryArchSuffix == $portVersion base
 	cmd:perl >= 5
-	vendor_perl
 	"
 REQUIRES_scalar="
 	haiku$secondaryArchSuffix
@@ -165,23 +164,9 @@ BUILD_REQUIRES="
 	devel:libpcre2_8$secondaryArchSuffix
 	devel:libssl$secondaryArchSuffix
 	devel:libz$secondaryArchSuffix
-	vendor_perl
 	"
 
-BUILD_PREREQUIRES="
-	cmd:awk
-	cmd:cmp
-	cmd:find
-	cmd:gcc$secondaryArchSuffix
-	cmd:gettext
-	cmd:ld$secondaryArchSuffix
-	cmd:make
-	cmd:msgfmt$secondaryArchSuffix
-	cmd:perl >= 5.40
-	cmd:sed
-	cmd:tar
-	"
-
+BUILD_PREREQUIRES=""
 TEST_REQUIRES="
 	cmd:diff
 	cmd:gawk
@@ -189,7 +174,13 @@ TEST_REQUIRES="
 
 makeGit()
 {
+	local gitCC="$CC"
+	if [ "$targetArchitecture" = arm64 ]; then
+		gitCC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir"
+	fi
 	make prefix=$prefix \
+		CC="$gitCC" \
+		STRIP="$targetMachineTriple-strip" \
 		bindir_relative=$relativeBinDir \
 		mandir=$manDir \
 		infodir=$infoDir \
@@ -200,10 +191,15 @@ makeGit()
 		sysconfdir=$sysconfDir \
 		PTHREAD_LIBS= \
 		USE_LIBPCRE2=YesPlease \
+		CSPRNG_METHOD=openssl \
+		HAVE_SYSINFO= \
+		HAVE_SYNC_FILE_RANGE= \
 		NO_D_TYPE_IN_DIRENT=YesPlease \
 		NO_MEMMEM=YesPlease \
 		NEEDS_LIBICONV=YesPlease \
 		NO_RUST=YesPlease \
+		NO_GETTEXT=YesPlease \
+		NO_TCLTK=YesPlease \
 		PERL_PATH=/bin/perl \
 		perllibdir=$prefix/$(perl -V:installvendorlib | cut -d\' -f2 | cut -d/ -f5-) \
 		NO_PYTHON=YesPlease \
@@ -220,12 +216,26 @@ makeGit()
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		sed -i -e "/HAVE_SYSINFO = YesPlease/d" -e "/HAVE_SYNC_FILE_RANGE = YesPlease/d" -e "/FSMONITOR_DAEMON_BACKEND = linux/d" -e "/FSMONITOR_OS_SETTINGS = unix/d" -e "/EXTLIBS += -ldl/d" "$sourceDir/config.mak.uname"
+	fi
 	makeGit $jobArgs
 	makeGit strip
 }
 
 INSTALL()
 {
+	local originalPrefix=$prefix
+	local originalLibDir=$libDir
+	if [ "$targetArchitecture" = arm64 ]; then
+		prefix="$installDestDir$prefix"
+		libDir="$installDestDir$libDir"
+		docDir="$installDestDir$docDir"
+		manDir="$installDestDir$manDir"
+		dataDir="$installDestDir$dataDir"
+		sysconfDir="$installDestDir$sysconfDir"
+	fi
+
 	makeGit install
 
 	# copy manpages
@@ -258,17 +268,36 @@ INSTALL()
 		if [ $program = "gitk" ]; then
 			continue
 		fi
-		ln -sfn "$libDir/git-core/$program" "$program"
+		ln -sfn "$originalLibDir/git-core/$program" "$program"
 	done
-	ln -sfn "$libDir/git-core/scalar" "scalar"
+	ln -sfn "$originalLibDir/git-core/scalar" "scalar"
 
-	packageEntries arch \
+	if [ "$targetArchitecture" = arm64 ]; then
+		prefix="$originalPrefix"
+	fi
+
+
+	packageEntriesIfPresent()
+	{
+		local suffix=$1
+		shift
+		local file
+		local entries=()
+		for file; do
+			[ -e "$file" ] && entries+=( "$file" )
+		done
+		if [ "${#entries[@]}" -gt 0 ]; then
+			packageEntries "$suffix" "${entries[@]}"
+		fi
+		return 0
+	}
+	packageEntriesIfPresent arch \
 		$docDir/git-archimport.html \
 		$manDir/man1/git-archimport.1 \
 		$libDir/git-core/git-archimport
 
-	packageEntries cvs \
-		$prefix/bin/git-cvsserver \
+	packageEntriesIfPresent cvs \
+		$installDestDir$prefix/bin/git-cvsserver \
 		$docDir/git-cvsexportcommit.html \
 		$docDir/git-cvsimport.html \
 		$docDir/git-cvsserver.html \
@@ -280,7 +309,7 @@ INSTALL()
 		$libDir/git-core/git-cvsimport \
 		$libDir/git-core/git-cvsserver
 
-	packageEntries daemon \
+	packageEntriesIfPresent daemon \
 		$docDir/git-credential-cache--daemon.html \
 		$docDir/git-credential-cache.html \
 		$docDir/git-daemon.html \
@@ -291,12 +320,12 @@ INSTALL()
 		$libDir/git-core/git-credential-cache \
 		$libDir/git-core/git-daemon
 
-	packageEntries email \
+	packageEntriesIfPresent email \
 		$docDir/git-send-email.html \
 		$manDir/man1/git-send-email.1 \
 		$libDir/git-core/git-send-email
 
-	packageEntries gui \
+	packageEntriesIfPresent gui \
 		$docDir/git-gui.html \
 		$docDir/gitk.html \
 		$manDir/man1/git-gui.1 \
@@ -308,21 +337,21 @@ INSTALL()
 		$libDir/git-core/git-citool \
 		$prefix/bin/gitk
 
-	packageEntries perl \
-		$prefix/lib/perl5
+	packageEntriesIfPresent perl \
+		$installDestDir$prefix/lib/perl5
 
-	packageEntries scalar \
+	packageEntriesIfPresent scalar \
 		$docDir/scalar.html \
 		$manDir/man1/scalar.1 \
 		$libDir/git-core/scalar \
-		$prefix/bin/scalar
+		$installDestDir$prefix/bin/scalar
 
-	packageEntries svn \
+	packageEntriesIfPresent svn \
 		$docDir/git-svn.html \
 		$manDir/man1/git-svn.1 \
 		$libDir/git-core/git-svn
 
-	packageEntries web \
+	packageEntriesIfPresent web \
 		$docDir/gitweb*.html \
 		$docDir/git-instaweb.html \
 		$manDir/man1/gitweb.1 \

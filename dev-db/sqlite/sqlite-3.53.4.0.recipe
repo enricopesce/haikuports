@@ -50,12 +50,18 @@ BUILD_PREREQUIRES="
 	cmd:make
 	"
 
-defineDebugInfoPackage sqlite$secondaryArchSuffix \
-	"$libDir"/libsqlite3.so.$libVersion
+if [ "$targetArchitecture" = arm64 ]; then
+	debugInfoDir=$installDestDir$debugInfoDir
+	defineDebugInfoPackage sqlite$secondaryArchSuffix \
+		"$installDestDir$libDir/libsqlite3.so.$libVersion"
+else
+	defineDebugInfoPackage sqlite$secondaryArchSuffix \
+		"$libDir/libsqlite3.so.$libVersion"
+fi
 
 BUILD()
 {
-	export CPPFLAGS="$CPPFLAGS \
+	local sqliteCPPFLAGS="$CPPFLAGS \
 		-DSQLITE_ENABLE_COLUMN_METADATA=1 \
 		-DSQLITE_ENABLE_UNLOCK_NOTIFY \
 		-DSQLITE_ENABLE_DBSTAT_VTAB \
@@ -67,7 +73,16 @@ BUILD()
 
 	# "--with-readline-header=$developDir" needed to fix readline
 	# detection on x86.
-	./configure --prefix=$prefix \
+	# Build the native autosetup helper without cross compiler environment.
+	(
+		unset CC CXX LD CFLAGS CXXFLAGS LDFLAGS CPPFLAGS CPATH \
+			C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
+		export CC_FOR_BUILD=/usr/bin/cc
+		./autosetup/autosetup-find-tclsh
+	)
+	export CPPFLAGS="$sqliteCPPFLAGS"
+	./configure --build=$buildMachineTriple --host=$targetMachineTriple \
+		--prefix=$prefix \
 		--mandir=$manDir \
 		--includedir=$includeDir \
 		--libdir=$libDir \
@@ -77,16 +92,17 @@ BUILD()
 
 	# Not using "make $jobArgs" because parallel builds are not supported.
 	make
+	rm -f jimsh0
 }
 
 INSTALL()
 {
-	make install
+	make install DESTDIR="$installDestDir"
 
 	prepareInstalledDevelLib libsqlite3
 	fixPkgconfig
 
 	# devel package
 	packageEntries devel \
-		$developDir
+		"$installDestDir$developDir"
 }

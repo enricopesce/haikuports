@@ -53,9 +53,7 @@ BUILD_PREREQUIRES="
 	cmd:autoconf
 	cmd:autoheader
 	cmd:automake
-	cmd:autopoint$secondaryArchSuffix
 	cmd:gcc$secondaryArchSuffix
-	cmd:gtkdocize
 	cmd:ld$secondaryArchSuffix
 	cmd:libtoolize$secondaryArchSuffix
 	cmd:make
@@ -64,13 +62,15 @@ BUILD_PREREQUIRES="
 	cmd:pkg_config$secondaryArchSuffix
 	"
 
-defineDebugInfoPackage libidn2$secondaryArchSuffix \
-	$commandBinDir/idn2 \
-	$libDir/libidn2.so.$libVersion
+if [ "$targetArchitecture" != arm64 ]; then
+	defineDebugInfoPackage libidn2$secondaryArchSuffix \
+		$commandBinDir/idn2 \
+		$libDir/libidn2.so.$libVersion
+fi
 
 BUILD()
 {
-	autoreconf -fi
+	GTKDOCIZE=/bin/true autoreconf -fi
 	runConfigure --omit-dirs binDir ./configure \
 		--bindir $commandBinDir \
 		--disable-static
@@ -80,6 +80,13 @@ BUILD()
 INSTALL()
 {
 	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir" "$installDestDir$includeDir" "$installDestDir$developLibDir/pkgconfig" "$installDestDir$prefix/$relativeBinDir"
+		cp -af "$sourceDir/lib/.libs/"libidn2.so* "$installDestDir$libDir/"
+		cp -af "$sourceDir/lib/idn2.h" "$installDestDir$includeDir/"
+		cp -af "$sourceDir/libidn2.pc" "$installDestDir$developLibDir/pkgconfig/"
+		cp -af "$sourceDir/src/.libs/idn2" "$installDestDir$prefix/$relativeBinDir/"
+	fi
 
 	rm -f $libDir/libidn2.la
 	rm -f $libDir/charset.alias
@@ -89,10 +96,11 @@ INSTALL()
 	fixPkgconfig
 
 	# devel package
-	packageEntries devel \
-		$developDir \
-		$infoDir \
-		$manDir/man3
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel $relativeDevelopDir
+	else
+		packageEntries devel $developDir $infoDir $manDir/man3
+	fi
 }
 
 TEST()

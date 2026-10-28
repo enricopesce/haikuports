@@ -65,9 +65,16 @@ BUILD_PREREQUIRES="
 	cmd:pkg_config$secondaryArchSuffix
 	"
 
-defineDebugInfoPackage readline$secondaryArchSuffix \
-	$libDir/libhistory.so.8.3 \
-	$libDir/libreadline.so.8.3
+if [ "$targetArchitecture" = arm64 ]; then
+	debugInfoDir=$installDestDir$debugInfoDir
+	defineDebugInfoPackage readline$secondaryArchSuffix \
+		"$installDestDir$libDir/libhistory.so.8.3" \
+		"$installDestDir$libDir/libreadline.so.8.3"
+else
+	defineDebugInfoPackage readline$secondaryArchSuffix \
+		$libDir/libhistory.so.8.3 \
+		$libDir/libreadline.so.8.3
+fi
 
 PATCH()
 {
@@ -86,20 +93,20 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	make install DESTDIR="$installDestDir"
 
-	rm $libDir/lib*.a
+	rm -f "$installDestDir$libDir"/lib*.a
 
-	mkdir -p $libDir/pkgconfig
-	cp $sourceDir/readline.pc $libDir/pkgconfig/
+	mkdir -p "$installDestDir$libDir/pkgconfig"
+	cp $sourceDir/readline.pc "$installDestDir$libDir/pkgconfig/"
 
 	prepareInstalledDevelLibs libhistory libreadline
-	rmdir $binDir
+	rmdir "$installDestDir$binDir" 2>/dev/null || true
 	fixPkgconfig
 
 	# devel package
 	packageEntries devel \
-		$dataDir \
-		$developDir \
-		$documentationDir
+		"$installDestDir$dataDir" \
+		"$installDestDir$developDir" \
+		"$installDestDir$documentationDir"
 }

@@ -96,7 +96,9 @@ if [ -z "$secondaryArchSuffix" ]; then
 		debugList+=("${binDir/$portName/${portName}_tools}"/$i)
 	done
 fi
-defineDebugInfoPackage $portName "${debugList[@]}"
+if [ "$targetArchitecture" != arm64 ]; then
+	defineDebugInfoPackage $portName "${debugList[@]}"
+fi
 
 BUILD()
 {
@@ -110,6 +112,15 @@ BUILD()
 INSTALL()
 {
 	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir"
+		cp -af "$sourceDir/libtiff/.libs/libtiff.so"* "$sourceDir/libtiff/.libs/libtiffxx.so"* "$installDestDir$libDir/"
+		mkdir -p "$installDestDir$includeDir" "$installDestDir$libDir/pkgconfig"
+		cp -f "$sourceDir/libtiff/tiff.h" "$sourceDir/libtiff/tiffio.h" "$sourceDir/libtiff/tiffvers.h" "$sourceDir/libtiff/tiffio.hxx" "$sourceDir/libtiff/tiffconf.h" "$installDestDir$includeDir/"
+		cp -f "$sourceDir/libtiff-4.pc" "$installDestDir$libDir/pkgconfig/"
+		mkdir -p "$installDestDir$binDir"
+		cp -f "$sourceDir"/tools/.libs/* "$installDestDir$binDir/"
+	fi
 
 	prepareInstalledDevelLibs \
 		libtiff \
@@ -117,15 +128,23 @@ INSTALL()
 	fixPkgconfig
 
 	# devel package
-	packageEntries devel \
-		$developDir \
-		$manDir/man3
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel "$relativeDevelopDir"
+	else
+		packageEntries devel \
+			$developDir \
+			$manDir/man3
+	fi
 
 	# tools package
 	if [ -z "$secondaryArchSuffix" ]; then
-		packageEntries tools \
-			$binDir \
-			$documentationDir
+		if [ "$targetArchitecture" = arm64 ]; then
+			packageEntries tools "$relativeBinDir"
+		else
+			packageEntries tools \
+				$binDir \
+				$documentationDir
+		fi
 	fi
 
 	# Remove stuff we don't need in the secondary architecture base package.

@@ -70,15 +70,28 @@ INSTALL()
 {
 	make install
 
-	rm $libDir/libssh2.la
+	rm -f $libDir/libssh2.la
 
-	prepareInstalledDevelLibs libssh2
-	fixPkgconfig
+	if [ "$targetArchitecture" = arm64 ]; then
+		arm64Stage="$installDestDir$prefix"
+		mkdir -p "$arm64Stage/$relativeLibDir" "$arm64Stage/$relativeIncludeDir" "$arm64Stage/$relativeDevelopLibDir/pkgconfig"
+		cp -af "$sourceDir/src/.libs/"libssh2.so* "$arm64Stage/$relativeLibDir/"
+		cp -af "$sourceDir/include/libssh2.h" "$sourceDir/include/libssh2_sftp.h" "$arm64Stage/$relativeIncludeDir/"
+		cp -af "$sourceDir/libssh2.pc" "$arm64Stage/$relativeDevelopLibDir/pkgconfig/"
+		ln -sf ../../$relativeLibDir/libssh2.so.1.0.1 "$arm64Stage/$relativeDevelopLibDir/libssh2.so"
+	else
+		prepareInstalledDevelLibs libssh2
+		fixPkgconfig
+	fi
 
 	# devel package
-	packageEntries devel \
-		$developDir \
-		$manDir
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel $relativeDevelopDir
+	else
+		packageEntries devel \
+			$developDir \
+			$manDir
+	fi
 }
 
 TEST()

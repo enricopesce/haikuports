@@ -26,7 +26,11 @@ BUILD_REQUIRES="
 	haiku_devel
 	"
 
-PYTHON_VERSIONS=(3.10 3.14)
+if [ "$targetArchitecture" = arm64 ]; then
+	PYTHON_VERSIONS=(3.10)
+else
+	PYTHON_VERSIONS=(3.10 3.14)
+fi
 
 for pythonVersion in ${PYTHON_VERSIONS[@]}; do
 	pythonPackage=python${pythonVersion//.}
@@ -58,6 +62,9 @@ done
 
 INSTALL()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		export PATH="/work/host-tools/bin:$PATH"
+	fi
 	for pythonVersion in ${PYTHON_VERSIONS[@]}; do
 		pythonPackage=python${pythonVersion//.}
 
@@ -71,7 +78,16 @@ INSTALL()
 		$python setup.py build install \
 			--root=/ --prefix=$prefix
 
-		packageEntries $pythonPackage \
-			$prefix/lib/python*
+		if [ "$targetArchitecture" = arm64 ] && [ ! -d "$installDestDir$prefix/lib/python$pythonVersion" ]; then
+			mkdir -p "$installDestDir$prefix/lib"
+			cp -a "$prefix/lib/python$pythonVersion" "$installDestDir$prefix/lib/"
+		fi
+
+		if [ "$targetArchitecture" = arm64 ]; then
+			packageEntries $pythonPackage "lib/python$pythonVersion"
+		else
+			packageEntries $pythonPackage \
+				$prefix/lib/python*
+		fi
 	done
 }

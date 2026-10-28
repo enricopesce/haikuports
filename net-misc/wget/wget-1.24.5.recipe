@@ -59,10 +59,30 @@ BUILD_PREREQUIRES="
 	cmd:pkg_config$secondaryArchSuffix
 	cmd:pod2man
 	"
+if [ "$targetArchitecture" = arm64 ]; then
+	BUILD_PREREQUIRES="
+		autoconf_archive
+		cmd:autoconf
+		cmd:aclocal
+		cmd:find
+		cmd:gcc$secondaryArchSuffix
+		cmd:gettext
+		cmd:libtoolize$secondaryArchSuffix
+		cmd:make
+		cmd:pkg_config$secondaryArchSuffix
+		"
+fi
 
 BUILD()
 {
-	autoreconf -fi
+	if [ "$targetArchitecture" = arm64 ]; then
+		export PKG_CONFIG_SYSROOT_DIR="$crossSysrootDir"
+		export PKG_CONFIG_LIBDIR="$crossSysrootDir/boot/system/develop/lib/pkgconfig:$crossSysrootDir/boot/system/develop/share/pkgconfig"
+		sed -e "s/^Name: OpenSSL-libssl/Name: OpenSSL/" -e "s/-lssl$/-lssl -lcrypto/" "$crossSysrootDir/boot/system/develop/lib/pkgconfig/libssl.pc" > "$crossSysrootDir/boot/system/develop/lib/pkgconfig/openssl.pc"
+		ACLOCAL_PATH="$crossSysrootDir/boot/system/data/aclocal" autoreconf -fi
+	else
+		autoreconf -fi
+	fi
 	runConfigure --omit-dirs binDir ./configure \
 		--with-ssl=openssl --bindir=$prefix/bin
 	make
@@ -70,8 +90,13 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+	else
+		make install
+	fi
 	# Tells wget where to find certificates
+	mkdir -p "$settingsDir"
 	echo "ca_certificate=/boot/system/data/ssl/CARootCertificates.pem" > $settingsDir/wgetrc
 	rm -f "$infoDir"/dir
 	rm -f "$libDir"/charset.alias

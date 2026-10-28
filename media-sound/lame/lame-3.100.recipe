@@ -70,24 +70,35 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
-	runConfigure ./configure --enable-nasm \
-		--disable-static
+	if [ "$targetArchitecture" = arm64 ]; then
+		runConfigure ./configure --disable-nasm --disable-static
+	else
+		runConfigure ./configure --enable-nasm --disable-static
+	fi
 	make $jobArgs
 }
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+	else
+		make install
+	fi
 	if [ -n "$secondaryArchSuffix" ]; then
 		rm $binDir/lame
 	fi
 
-	rm $libDir/libmp3lame.la
+	rm -f $libDir/libmp3lame.la
 
 	# prepare devel/lib
 	prepareInstalledDevelLibs libmp3lame
 	fixPkgconfig
 
 	# devel package
-	packageEntries devel $developDir
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel develop
+	else
+		packageEntries devel $developDir
+	fi
 }

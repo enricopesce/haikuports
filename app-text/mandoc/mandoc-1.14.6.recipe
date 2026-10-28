@@ -78,12 +78,18 @@ USER_SETTINGS_FILES="settings/man.conf"
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		# mandoc hard-codes CC=cc, selecting the Linux host compiler.
+		sed -i "s|^CC=cc$|CC=$targetMachineTriple-gcc|" configure
+	fi
 	cat > configure.local << EOF
 		CFLAGS='-O2 -pipe -D_BSD_SOURCE'
-		DBDIR='$(finddir B_SYSTEM_VAR_DIRECTORY)/mandoc'
+		DBDIR='/var/db/mandoc'
 		HAVE_ERR=1
 		HAVE_PROGNAME=1
 		HAVE_STRSEP=1
+		HAVE_NTOHL=1
+		HAVE_NANOSLEEP=1
 		LDFLAGS="-lbsd"
 		LN='ln -sf'
 		MANDIR='$manDir'
@@ -98,14 +104,22 @@ EOF
 
 INSTALL()
 {
-	make install
+	local installManDir="$manDir"
+	if [ "$targetArchitecture" = arm64 ]; then
+		local stagePrefix="$installDestDir$prefix"
+		installManDir="$stagePrefix/documentation/man"
+		make install PREFIX="$stagePrefix" BINDIR="$stagePrefix/bin" \
+			SBINDIR="$stagePrefix/bin" MANDIR="$installManDir" SYSCONFDIR="$installDestDir$sysconfDir"
+	else
+		make install
+	fi
 
 	sed -i \
-		-e "s|/etc/man.conf|$(finddir B_SYSTEM_SETTINGS_DIRECTORY)/man.conf|" \
-		$manDir/man1/apropos.1 \
-		$manDir/man1/man.1 \
-		$manDir/man5/man.conf.5 \
-		$manDir/man8/makewhatis.8
+		-e "s|/etc/man.conf|/boot/system/settings/man.conf|" \
+		$installManDir/man1/apropos.1 \
+		$installManDir/man1/man.1 \
+		$installManDir/man5/man.conf.5 \
+		$installManDir/man8/makewhatis.8
 }
 
 # Won't work unless UTF-8 support is re-enabled

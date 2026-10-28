@@ -50,8 +50,10 @@ BUILD_PREREQUIRES="
 	cmd:sed
 	"
 
+if [ "$targetArchitecture" != arm64 ]; then
 defineDebugInfoPackage libedit$secondaryArchSuffix \
 	"$libDir"/libedit.so.$libVersion
+fi
 
 BUILD()
 {
@@ -65,6 +67,14 @@ BUILD()
 INSTALL()
 {
 	make install
+
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir/pkgconfig" "$installDestDir$includeDir" "$installDestDir$includeDir/editline"
+		cp -af "$sourceDir/src/.libs/"libedit.so* "$installDestDir$libDir/"
+		cp -f "$sourceDir/src/histedit.h" "$installDestDir$includeDir/"
+		cp -f "$sourceDir/src/editline/readline.h" "$installDestDir$includeDir/editline/"
+		cp -f "$sourceDir/libedit.pc" "$installDestDir$libDir/pkgconfig/"
+	fi
 
 	# remove libtool file
 	rm -f "$libDir"/libedit.la
@@ -80,9 +90,11 @@ INSTALL()
 	fixPkgconfig
 
 	# devel package
-	packageEntries devel \
-		"$developDir" \
-		${maybe_manDir_man3:+"$maybe_manDir_man3"}
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel "$relativeDevelopDir"
+	else
+		packageEntries devel "$developDir" ${maybe_manDir_man3:+"$maybe_manDir_man3"}
+	fi
 }
 
 TEST()

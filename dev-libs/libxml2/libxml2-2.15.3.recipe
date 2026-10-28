@@ -35,7 +35,12 @@ else
 	fi
 fi
 
-pythonVersion=3.14
+if [ "$targetArchitecture" = arm64 ]; then
+	pythonModuleEnabled=false
+	pythonVersion=3.10
+else
+	pythonVersion=3.14
+fi
 pythonPackage=python${pythonVersion//.}
 
 PROVIDES="
@@ -124,6 +129,9 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		export PATH="/work/host-tools/bin:$PATH"
+	fi
 	withPython=
 	if $pythonModuleEnabled; then
 		withPython="--with-python"
@@ -142,6 +150,18 @@ BUILD()
 INSTALL()
 {
 	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir" "$installDestDir$binDir"
+		cp -af "$sourceDir/.libs/libxml2.so"* "$installDestDir$libDir/"
+		cp -f "$sourceDir/xmllint" "$sourceDir/xmlcatalog" "$sourceDir/xml2-config" "$installDestDir$binDir/"
+		mkdir -p "$installDestDir$prefix/$relativeDataDir/aclocal"
+		cp -f "$sourceDir/aclocal.m4" "$installDestDir$prefix/$relativeDataDir/aclocal/"
+		mkdir -p "$installDestDir$prefix/$relativeDocumentationDir/packages/libxml2" "$installDestDir$prefix/$relativeManDir/man1"
+		cp -r "$sourceDir/dist-doc/html/"* "$installDestDir$prefix/$relativeDocumentationDir/packages/libxml2/"
+		cp -r "$sourceDir"/dist-doc/*.html "$installDestDir$prefix/$relativeDocumentationDir/packages/libxml2/"
+		cp -f "$sourceDir"/dist-doc/*.1 "$installDestDir$prefix/$relativeManDir/man1/"
+		cp -f "$sourceDir/doc/xml2-config.1" "$installDestDir$prefix/$relativeManDir/man1/"
+	fi
 
 	# documentation
 	mkdir -p $documentationDir/packages/libxml2 $manDir/man1
@@ -171,15 +191,23 @@ INSTALL()
 	fi
 
 	# devel package
-	packageEntries devel \
-		$binDir/xml2-config \
-		$dataDir \
-		$developDir \
-		$manDir/man1/xml2-config.1 \
-		$libDir/cmake
-
-	packageEntries doc \
-		$prefix/documentation/packages/libxml2
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel \
+			"$relativeBinDir/xml2-config" \
+			"$relativeDataDir" \
+			"$relativeDevelopDir" \
+			"$relativeManDir/man1/xml2-config.1"
+		packageEntries doc "$relativeDocumentationDir/packages/libxml2"
+	else
+		packageEntries devel \
+			$binDir/xml2-config \
+			$dataDir \
+			$developDir \
+			$manDir/man1/xml2-config.1 \
+			$libDir/cmake
+		packageEntries doc \
+			$prefix/documentation/packages/libxml2
+	fi
 
 	# Remove stuff we don't need in the secondary architecture base package.
 	if [ -n "$secondaryArchSuffix" ]; then

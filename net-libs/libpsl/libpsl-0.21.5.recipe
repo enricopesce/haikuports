@@ -55,16 +55,17 @@ BUILD_PREREQUIRES="
 	cmd:automake
 	cmd:autoheader
 	cmd:autoreconf
-	cmd:autopoint
 	cmd:gcc$secondaryArchSuffix
 	cmd:make
 	cmd:pkg_config$secondaryArchSuffix
 	cmd:python3
 	"
 
-defineDebugInfoPackage libpsl$secondaryArchSuffix \
-	"$binDir"/psl \
-	"$libDir"/libpsl.so.$libVersion
+if [ "$targetArchitecture" != arm64 ]; then
+	defineDebugInfoPackage libpsl$secondaryArchSuffix \
+		"$binDir"/psl \
+		"$libDir"/libpsl.so.$libVersion
+fi
 
 PATCH()
 {
@@ -73,6 +74,11 @@ PATCH()
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		CPPFLAGS="-I$crossSysrootDir/boot/system/develop/headers -I$crossSysrootDir/boot/system/develop/headers/posix ${CPPFLAGS:-}"
+		LDFLAGS="${LDFLAGS:-} -L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib"
+		export CPPFLAGS LDFLAGS
+	fi
 	autoreconf
 	runConfigure ./configure --enable-runtime=$IDNA --enable-builtin=$IDNA
 	make $jobArgs LIBS="-lnetwork -lunistring -l${IDNA:3}"
@@ -83,13 +89,24 @@ INSTALL()
 	make install
 	install -t "$binDir" src/psl-make-dafsa
 
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir" "$installDestDir$includeDir" "$installDestDir$developLibDir/pkgconfig" "$installDestDir$binDir"
+		cp -af "$sourceDir/src/.libs/"libpsl.so* "$installDestDir$libDir/"
+		cp -f "$sourceDir/include/libpsl.h" "$installDestDir$includeDir/"
+		cp -f "$sourceDir/libpsl.pc" "$installDestDir$developLibDir/pkgconfig/"
+		cp -f "$sourceDir/tools/.libs/psl" "$installDestDir$binDir/psl"
+	fi
+
 	rm -f "$libDir"/libpsl.la "$libDir"/libpsl.a
 
 	prepareInstalledDevelLib libpsl
 	fixPkgconfig
 
-	packageEntries devel \
-		"$developDir"
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel $relativeDevelopDir
+	else
+		packageEntries devel "$developDir"
+	fi
 }
 
 TEST()

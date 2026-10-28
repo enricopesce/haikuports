@@ -90,6 +90,10 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		export PKG_CONFIG_SYSROOT_DIR="$crossSysrootDir"
+		export PKG_CONFIG_LIBDIR="$crossSysrootDir/boot/system/develop/lib/pkgconfig:$crossSysrootDir/boot/system/develop/share/pkgconfig"
+	fi
 	touch configure
 	defaultPath=".:/boot/home/config/non-packaged/bin:/boot/home/config/bin"
 	defaultPath+=":/boot/system/non-packaged/bin:/boot/system/bin:/bin"
@@ -112,31 +116,52 @@ BUILD()
 
 INSTALL()
 {
-	make install-nokeys
-	mkdir -p $postInstallDir
-	cp -f $portDir/additional-files/sshd_keymaker.sh $postInstallDir
-	cp -f $portDir/additional-files/fix_openssh_config_paths.sh $postInstallDir
+	if [ "$targetArchitecture" != arm64 ]; then
+		make install-nokeys
+		mkdir -p $postInstallDir
+		cp -f $portDir/additional-files/sshd_keymaker.sh $postInstallDir
+		cp -f $portDir/additional-files/fix_openssh_config_paths.sh $postInstallDir
+		install -m 755 contrib/ssh-copy-id $binDir
+		install -m 644 contrib/ssh-copy-id.1 $manDir/man1
+		local USER_SETTINGS_DIR="$(finddir B_USER_SETTINGS_DIRECTORY)"
+		sed -i -e "s| ~/\.ssh/| $USER_SETTINGS_DIR/ssh/|" $sysconfDir/ssh/ssh_config
+		local SYSTEM_SETTINGS_DIR="$(finddir B_SYSTEM_SETTINGS_DIRECTORY)"
+		local VAR_DIR="$(finddir B_SYSTEM_VAR_DIRECTORY)"
+		local LIB_DIR="$(finddir B_SYSTEM_LIB_DIRECTORY)"
+		sed -i -e "s|$sysconfDir/ssh/|$SYSTEM_SETTINGS_DIR/ssh/|" \
+			-e "s|$prefix/var/run/|$VAR_DIR/run/|" \
+			-e "s|$libExecDir/openssh/|$LIB_DIR/openssh/|" $sysconfDir/ssh/sshd_config
+		mkdir -p $dataDir/openssh/empty
+		cp $sysconfDir/ssh/ssh_config $dataDir/openssh/ssh_config.default
+		cp $sysconfDir/ssh/sshd_config $dataDir/openssh/sshd_config.default
+		return
+	fi
+	local stagePrefix="$installDestDir$prefix"
+	local stageSysconfDir="$installDestDir$sysconfDir"
+	local stageDataDir="$installDestDir$dataDir"
+	local stagePostInstallDir="$installDestDir$postInstallDir"
+	make install-nokeys DESTDIR="$installDestDir" STRIP_OPT=
+	mkdir -p "$stagePostInstallDir"
+	cp -f "$portDir/additional-files/sshd_keymaker.sh" "$stagePostInstallDir"
+	cp -f "$portDir/additional-files/fix_openssh_config_paths.sh" "$stagePostInstallDir"
+	install -m 755 contrib/ssh-copy-id "$installDestDir$binDir"
+	install -m 644 contrib/ssh-copy-id.1 "$installDestDir$manDir/man1"
 
-	install -m 755 contrib/ssh-copy-id $binDir
-	install -m 644 contrib/ssh-copy-id.1 $manDir/man1
-
-	local USER_SETTINGS_DIR="`finddir B_USER_SETTINGS_DIRECTORY`"
+	local USER_SETTINGS_DIR="/boot/home/config/settings"
+	local SYSTEM_SETTINGS_DIR="/boot/system/settings"
+	local VAR_DIR="/boot/system/var"
+	local LIB_DIR="/boot/system/lib"
 	sed -i \
 		-e "s| ~/\.ssh/| $USER_SETTINGS_DIR/ssh/|" \
-		$sysconfDir/ssh/ssh_config
-
-	local SYSTEM_SETTINGS_DIR="`finddir B_SYSTEM_SETTINGS_DIRECTORY`"
-	local VAR_DIR="`finddir B_SYSTEM_VAR_DIRECTORY`"
-	local LIB_DIR="`finddir B_SYSTEM_LIB_DIRECTORY`"
+		"$stageSysconfDir/ssh/ssh_config"
 	sed -i \
 		-e "s|$sysconfDir/ssh/|$SYSTEM_SETTINGS_DIR/ssh/|" \
 		-e "s|$prefix/var/run/|$VAR_DIR/run/|" \
 		-e "s|$libExecDir/openssh/|$LIB_DIR/openssh/|" \
-		$sysconfDir/ssh/sshd_config
-
-	mkdir -p $dataDir/openssh/empty
-	cp $sysconfDir/ssh/ssh_config $dataDir/openssh/ssh_config.default
-	cp $sysconfDir/ssh/sshd_config $dataDir/openssh/sshd_config.default
+		"$stageSysconfDir/ssh/sshd_config"
+	mkdir -p "$stageDataDir/openssh/empty"
+	cp "$stageSysconfDir/ssh/ssh_config" "$stageDataDir/openssh/ssh_config.default"
+	cp "$stageSysconfDir/ssh/sshd_config" "$stageDataDir/openssh/sshd_config.default"
 }
 
 TEST()

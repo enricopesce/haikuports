@@ -8,7 +8,7 @@ a long-term storing or transferring."
 HOMEPAGE="https://github.com/rhash/RHash"
 COPYRIGHT="2005 Aleksey Kravchenko"
 LICENSE="MIT"
-REVISION="2"
+REVISION="3"
 SOURCE_URI="https://github.com/rhash/RHash/archive/v$portVersion.tar.gz"
 CHECKSUM_SHA256="9f6019cfeeae8ace7067ad22da4e4f857bb2cfa6c2deaa2258f55b2227ec937a"
 SOURCE_DIR="RHash-$portVersion"
@@ -77,7 +77,7 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	INSTALL_INCDIR="$includeDir" \
-	./configure --prefix="$prefix" --bindir="$commandBinDir" \
+	runConfigure --omit-buildspec --omit-dirs "prefix sysconfDir dataDir dataRootDir binDir sbinDir libDir includeDir oldIncludeDir docDir infoDir manDir libExecDir sharedStateDir localStateDir" ./configure --prefix="$prefix" --bindir="$commandBinDir" \
 		--libdir="$libDir" --localedir="$dataDir"/locale --mandir="$manDir" \
 		--sysconfdir="$sysconfDir" --disable-shani
 	make $jobArgs
@@ -85,14 +85,14 @@ BUILD()
 
 INSTALL()
 {
-	make install install-pkg-config
-	make -C librhash install-lib-headers install-lib-shared install-so-link
+	make DESTDIR="$installDestDir" install install-pkg-config
+	make -C librhash DESTDIR="$installDestDir" install-lib-headers install-lib-shared install-so-link
 
 	prepareInstalledDevelLib librhash
 	fixPkgconfig
 
 	packageEntries devel \
-		"$developDir"
+		"$installDestDir$developDir"
 }
 
 TEST()

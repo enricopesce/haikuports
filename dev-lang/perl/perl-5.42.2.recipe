@@ -101,50 +101,116 @@ BUILD_PREREQUIRES="
 	"
 
 perlArchName="$(uname -m)-haiku-thread-multi"
+if [ "$targetArchitecture" = arm64 ]; then
+	perlArchName="aarch64-unknown-haiku-thread-multi"
+fi
 
 BUILD_PACKAGE_ACTIVATION_PHASE=INSTALL
 
 BUILD()
 {
-	./Configure \
-		-Dprefix=$prefix \
-		-Dprivlib=$prefix/lib/perl5/$portVersion \
-		-Dman1dir=$manDir/man1 \
-		-Dman3dir=$manDir/man3 \
-		-Dsiteprefix=$prefix/non-packaged \
-		-Dsitelib=$prefix/non-packaged/lib/perl5/site_perl/$perlShortVersion \
-		-Dsiteman1dir=$prefix/non-packaged/$relativeManDir/man1 \
-		-Dsiteman3dir=$prefix/non-packaged/$relativeManDir/man3 \
-		-Dvendorprefix=$prefix \
-		-Dvendorlib=$prefix/lib/perl5/vendor_perl/$perlShortVersion \
-		-Dvendorman1dir=$manDir/man1 \
-		-Dvendorman3dir=$manDir/man3 \
-		-Dcf_email=zooey@hirschkaefer.de \
-		-Uusenm -Duseshrplib -Dusethreads -Uusemymalloc \
-		-Dlibpth="$(finddir B_USER_DEVELOP_DIRECTORY)/lib$secondaryArchSubDir $(finddir B_SYSTEM_DEVELOP_DIRECTORY)/lib$secondaryArchSubDir $(finddir B_USER_LIB_DIRECTORY)$secondaryArchSubDir $(finddir B_SYSTEM_LIB_DIRECTORY)$secondaryArchSubDir" \
-		-Dusrinc="$(finddir B_SYSTEM_DEVELOP_DIRECTORY)/headers$secondaryArchSubDir/posix" \
-		-Dlocinc="$(finddir B_USER_CONFIG_DIRECTORY)/develop/headers$secondaryArchSubDir $(finddir B_SYSTEM_DEVELOP_DIRECTORY)/headers$secondaryArchSubDir" \
-		-Dlibc="'$(finddir B_SYSTEM_LIB_DIRECTORY)$secondaryArchSubDir/libroot.so'" \
-		-Dlibs=-lnetwork -Dcc=gcc -Dld=gcc \
-		-Ud_link -Ddont_use_nlink -Ud_syserrlst \
-		-Dldlibpthname=LIBRARY_PATH -Dstartperl="#! perl" \
-		-Dccdlflags="-Wl,-fno-stack-protector,-rpath=$prefix/lib/perl5/$portVersion/$perlArchName/CORE" \
-		-Dusesitecustomize \
-		-de
+	local perlPrefix="$prefix"
+	local perlLibpth
+	local perlUsrinc
+	local perlLocinc
+	local perlLibc
+	local perlCC="gcc"
+	local perlLD="gcc"
+	local crossArgs=""
+	if [ "$targetArchitecture" = arm64 ]; then
+		# Configure builds host-side miniperl helpers before the target.
+		# Clear HaikuPorter cross environment for that bootstrap phase.
+		unset CC CXX LD CFLAGS CXXFLAGS LDFLAGS CPATH LIBRARY_PATH
+		sed -i "s/\$^O eq 'haiku'/\$Config{osname} eq 'haiku'/" ext/Errno/Errno_pm.PL
+		sed -i '/my \$cpp      =/c\    my $cpp = 0;' cpan/Encode/bin/enc2xs
+		sed -i "s@/boot/system/develop/headers/posix/errno.h@${crossSysrootDir}/boot/system/develop/headers/posix/errno.h@" ext/Errno/Errno_pm.PL
+		perlLibpth="$crossSysrootDir/boot/system/develop/lib $crossSysrootDir/boot/system/lib"
+		perlUsrinc="$crossSysrootDir/boot/system/develop/headers/posix"
+		perlLocinc="$crossSysrootDir/boot/system/develop/headers"
+		perlLibc="$crossSysrootDir/boot/system/lib/libroot.so"
+		perlPrefix="$installDestDir$prefix"
+		local perlToolBin="$workDir/arm64-cross-tool-prefix"
+		mkdir -p "$perlToolBin"
+		ln -sf "$(command -v "$targetMachineTriple-as")" "$perlToolBin/as"
+		ln -sf "$(command -v "$targetMachineTriple-ld")" "$perlToolBin/ld"
+		ln -sf "$(command -v "$targetMachineTriple-ar")" "$perlToolBin/$targetMachineTriple-ar"
+		ln -sf "$(command -v "$targetMachineTriple-nm")" "$perlToolBin/$targetMachineTriple-nm"
+		ln -sf "$(command -v "$targetMachineTriple-ranlib")" "$perlToolBin/$targetMachineTriple-ranlib"
+		local perlGcc="$(command -v "$targetMachineTriple-gcc")"
+		cat > "$perlToolBin/$targetMachineTriple-gcc" << EOF
+#!/bin/sh
+exec "$perlGcc" -B"$perlToolBin/" -D_ALL_SOURCE -fno-stack-protector -std=gnu99 "\$@"
+EOF
+		chmod +x "$perlToolBin/$targetMachineTriple-gcc"
+		perlCC="$perlToolBin/$targetMachineTriple-gcc"
+		perlLD="$perlCC"
+		crossArgs="-Dusecrosscompile -Dknowitall -Duse64bitint -Dintsize=4 -Dshortsize=2 -Dlongsize=8 -Dlonglongsize=8 -Dptrsize=8 -Ddoublesize=8 -Dlseeksize=8 -Di_sys_types=define -Di_stdint=define -Di_inttypes=define -Di_sys_uio=define -Di_unistd=define -Du16type=uint16_t -Du32type=uint32_t -Di32type=int32_t -Divdformat='"ld"' -Duvuformat='"lu"' -Duvoformat='"lo"' -Duvxformat='"lx"' -DuvXUformat='"lX"' -DsPRId64='"ld"' -DsPRIi64='"li"' -DsPRIu64='"lu"' -DsPRIo64='"lo"' -DsPRIx64='"lx"' -DsPRIXU64='"lX"' -Di32dformat='"d"' -Du32uformat='"u"' -Du32oformat='"o"' -Du32xformat='"x"' -Du32XUformat='"X"' -Dbyteorder=12345678 -Dd_gettimeod=define -Dalignbytes=8 -Dcharbits=8 -Dd_writev=define -Dosname=haiku -Dtargethost=localhost -Dtargetrun=adb -Dtargetto=cp -Dtargetfrom=cp -Dtargetdir=$PWD -Dccflags=--sysroot=$crossSysrootDir -Dldflags=--sysroot=$crossSysrootDir"
+	else
+		perlLibpth="$(finddir B_USER_DEVELOP_DIRECTORY)/lib$secondaryArchSubDir $(finddir B_SYSTEM_DEVELOP_DIRECTORY)/lib$secondaryArchSubDir $(finddir B_USER_LIB_DIRECTORY)$secondaryArchSubDir $(finddir B_SYSTEM_LIB_DIRECTORY)$secondaryArchSubDir"
+		perlUsrinc="$(finddir B_SYSTEM_DEVELOP_DIRECTORY)/headers$secondaryArchSubDir/posix"
+		perlLocinc="$(finddir B_USER_CONFIG_DIRECTORY)/develop/headers$secondaryArchSubDir $(finddir B_SYSTEM_DEVELOP_DIRECTORY)/headers$secondaryArchSubDir"
+		perlLibc="$(finddir B_SYSTEM_LIB_DIRECTORY)$secondaryArchSubDir/libroot.so"
+	fi
+	if [ "$targetArchitecture" = arm64 ]; then
+		# Configure's C99 probe tries to run a target binary directly.
+		sed -i 's/\&\& \.\/try; then/\&\& true; then/' Configure
+	fi
+	./Configure 		-Dprefix=$perlPrefix 		-Dprivlib=$perlPrefix/lib/perl5/$portVersion 		-Dman1dir=$installDestDir$documentationDir/man/man1 		-Dman3dir=$installDestDir$documentationDir/man/man3 		-Dsiteprefix=$perlPrefix/non-packaged 		-Dsitelib=$perlPrefix/non-packaged/lib/perl5/site_perl/$perlShortVersion 		-Dsiteman1dir=$perlPrefix/non-packaged/$relativeManDir/man1 		-Dsiteman3dir=$perlPrefix/non-packaged/$relativeManDir/man3 		-Dvendorprefix=$perlPrefix 		-Dvendorlib=$perlPrefix/lib/perl5/vendor_perl/$perlShortVersion 		-Dvendorman1dir=$manDir/man1 		-Dvendorman3dir=$manDir/man3 		-Dcf_email=zooey@hirschkaefer.de 		-Uusenm -Duseshrplib -Dusethreads -Uusemymalloc 		-Dlibpth="$perlLibpth" 		-Dusrinc="$perlUsrinc" 		-Dlocinc="$perlLocinc" 		-Dlibc="$perlLibc" 		-Dlibs=-lnetwork -Dcc="$perlCC" -Dld="$perlLD" $crossArgs 		-Ud_link -Ddont_use_nlink -Ud_syserrlst 		-Dldlibpthname=LIBRARY_PATH -Dstartperl="#! perl" 		-Dccdlflags="-Wl,-fno-stack-protector,-rpath=$prefix/lib/perl5/$portVersion/$perlArchName/CORE" 		-Dusesitecustomize 		-de
 
-	# force-remove path from sed
+	if [ "$targetArchitecture" = arm64 ]; then
+		# Time::HiRes is configured by the target miniperl; preserve the verified target API despite failed cross probes.
+		sed -i '/^d_gettimeod=/c\d_gettimeod="define"' config.sh
+		sed -i '/^d_fork=/c\d_fork="define"' config.sh
+		sed -i '/^d_pipe=/c\d_pipe="define"' config.sh
+		sed -i '/^\/\* HAS_FORK:/,/^ \*\//c\#define HAS_FORK' config.h
+		sed -i '/^\/\* HAS_PIPE:/,/^ \*\//c\#define HAS_PIPE' config.h
+		sed -i '/^#define LSEEKSIZE/c\#define LSEEKSIZE 8' config.h
+		sed -i '/^#define SSize_t/c\#define SSize_t ssize_t' config.h
+		sed -i \
+			-e '/^#define SHORTSIZE/c\#define SHORTSIZE 2' \
+			-e '/^#define DOUBLESIZE/c\#define DOUBLESIZE 8' \
+			-e '/^#define I32SIZE/c\#define I32SIZE 4' \
+			-e '/^#define U32SIZE/c\#define U32SIZE 4' \
+			-e '/^#define I32df/c\#define I32df "d"' \
+			-e '/^#define U32of/c\#define U32of "o"' \
+			-e '/^#define U32uf/c\#define U32uf "u"' \
+			-e '/^#define U32xf/c\#define U32xf "x"' \
+			-e '/^#define U32Xf/c\#define U32Xf "X"' \
+			-e '/^#define IVdf/c\#define IVdf "ld"' \
+			-e '/^#define UVuf/c\#define UVuf "lu"' \
+			-e '/^#define UVof/c\#define UVof "lo"' \
+			-e '/^#define UVxf/c\#define UVxf "lx"' \
+			-e '/^#define UVXf/c\#define UVXf "lX"' \
+			-e '/^#define DOUBLEKIND/c\#define DOUBLEKIND 3' \
+			-e '/^#define NVMANTBITS/c\#define NVMANTBITS 52' \
+			-e '/^#define NVSIZE/c\#define NVSIZE 8' \
+			-e '/^#define LONG_DOUBLESIZE/c\#define LONG_DOUBLESIZE 16' \
+			-e '/^#define LONGDBLMANTBITS/c\#define LONGDBLMANTBITS 113' \
+			-e '/^#define Off_t_size/c\#define Off_t_size 8' \
+			-e '/^#define Size_t_size/c\#define Size_t_size 8' \
+			-e '/^#define Size_t[[:space:]]/c\#define Size_t unsigned long' \
+			-e '/^#define EBCDIC/d' config.h
+		sed -i -e '/^#define DOUBLEINFBYTES.*undef/d' -e '/^#define DOUBLENANBYTES.*undef/d' -e '/^#define LONGDBLINFBYTES.*undef/d' -e '/^#define LONGDBLNANBYTES.*undef/d' config.h
+	fi
 	sed -i -e 's/LOC_SED\s*"\/bin\/sed/LOC_SED "sed/' config.h
-
-	make $jobArgs
+	if [ "$targetArchitecture" = arm64 ]; then
+		make $jobArgs PERL=$PWD/host/miniperl
+	else
+		make $jobArgs
+	fi
 }
 
 INSTALL()
 {
-	make install
-	chmod a+x $prefix/bin/{perl,perlthanks}
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install PERL=$PWD/host/miniperl
+	else
+		make install
+	fi
+	chmod a+x $installDestDir$prefix/bin/{perl,perlthanks}
 
 	packageEntries doc \
-		$documentationDir
+		documentation
 }
 
 TEST()

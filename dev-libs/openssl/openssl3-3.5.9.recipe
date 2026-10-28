@@ -85,7 +85,6 @@ BUILD_PREREQUIRES="
 	cmd:gcc$secondaryArchSuffix
 	cmd:ld$secondaryArchSuffix
 	cmd:make
-	cmd:perl >= 5
 	cmd:sed
 	"
 
@@ -97,13 +96,15 @@ else
 		"
 fi
 
-defineDebugInfoPackage openssl3$secondaryArchSuffix \
-	$libDir/engines-3/capi.so \
-	$libDir/engines-3/loader_attic.so \
-	$libDir/engines-3/padlock.so \
-	$libDir/libcrypto.so.$libVersion \
-	$libDir/libssl.so.$libVersion \
-	$maybe_binDir_runtimes
+if [ "$targetArchitecture" != arm64 ]; then
+	defineDebugInfoPackage openssl3$secondaryArchSuffix \
+		$libDir/engines-3/capi.so \
+		$libDir/engines-3/loader_attic.so \
+		$libDir/engines-3/padlock.so \
+		$libDir/libcrypto.so.$libVersion \
+		$libDir/libssl.so.$libVersion \
+		$maybe_binDir_runtimes
+fi
 
 PATCH()
 {
@@ -118,7 +119,8 @@ BUILD()
 		configFlags=
 	fi
 
-	./config --prefix=$prefix --libdir=$relativeLibDir \
+	CC="$(getTargetArchitectureCommand gcc) --sysroot=$crossSysrootDir" \
+	./Configure haiku-aarch64 --prefix=$prefix --libdir=$relativeLibDir \
 		--openssldir=$dataRootDir/ssl \
 		enable-zlib enable-zstd shared $configFlags -g
 	make $jobArgs
@@ -135,8 +137,19 @@ INSTALL()
 	# remove static libraries
 	rm $libDir/*.a
 
-	# prepare develop/lib
-	prepareInstalledDevelLibs libcrypto libssl
+	# HaikuPorter does not stage the ARM64 shared objects from OpenSSL
+	# make install; copy the cross-compiled outputs into the HPKG staging root.
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir" "$installDestDir$includeDir/openssl" "$installDestDir$developLibDir/pkgconfig"
+		cp -af "$sourceDir"/libcrypto.so* "$sourceDir"/libssl.so* "$installDestDir$libDir/"
+		cp -af "$sourceDir/include/openssl/." "$installDestDir$includeDir/openssl/"
+		cp -af "$sourceDir/exporters/libcrypto.pc" "$sourceDir/exporters/libssl.pc" "$installDestDir$developLibDir/pkgconfig/"
+		ln -sf ../../$relativeLibDir/libcrypto.so.3 "$installDestDir$developLibDir/libcrypto.so"
+		ln -sf ../../$relativeLibDir/libssl.so.3 "$installDestDir$developLibDir/libssl.so"
+	else
+		prepareInstalledDevelLibs libcrypto libssl
+	fi
+
 	fixPkgconfig
 
 	if [ -n "$secondaryArchSuffix" ]; then
@@ -150,11 +163,16 @@ INSTALL()
 	chmod 700 $dataRootDir/ssl/private
 
 	# devel package
-	packageEntries devel \
-		$developDir \
-		$maybe_docDir_html_man3 \
-		$maybe_manDir_man3 \
-		$libDir/cmake
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel \
+			$relativeDevelopDir
+	else
+		packageEntries devel \
+			$developDir \
+			$maybe_docDir_html_man3 \
+			$maybe_manDir_man3 \
+			$libDir/cmake
+	fi
 
 	# Remove stuff we don't need in the secondary architecture base package
 	if [ -n "$secondaryArchSuffix" ]; then
@@ -162,7 +180,7 @@ INSTALL()
 		rm -rf $prefix/bin
 		rm -rf $dataRootDir/ssl
 		rm -rf $documentationDir
-	else
+	elif [ "$targetArchitecture" != arm64 ]; then
 		# man package
 		packageEntries man \
 			$manDir

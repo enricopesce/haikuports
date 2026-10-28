@@ -51,16 +51,15 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	make install DESTDIR="$installDestDir"
 
-	# remove libtool fille
-	rm $libDir/libffi.la
+	rm -f "$installDestDir$libDir/libffi.la"
 
 	prepareInstalledDevelLibs libffi
 	fixPkgconfig
 
 	# devel package
 	packageEntries devel \
-		$developDir \
-		$documentationDir
+		"$installDestDir$developDir" \
+		"$installDestDir$documentationDir"
 }

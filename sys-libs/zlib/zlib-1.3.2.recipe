@@ -57,6 +57,10 @@ BUILD()
 {
 	export mandir=$manDir # ./configure won't accept --mandir, but respects $mandir
 	export CFLAGS="-O2 -g -DNDEBUG" # similar to cmake's "RelWithDebugInfo" as used before.
+	if [ "$isCrossRepository" = true ]; then
+		export CC=$targetMachineTriple-gcc AR=$targetMachineTriple-ar RANLIB=$targetMachineTriple-ranlib
+		export LDFLAGS="-L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib"
+	fi
 
 	./configure \
 		--prefix=$prefix \
@@ -64,23 +68,27 @@ BUILD()
 		--includedir=$includeDir \
 		--sharedlibdir=$libDir
 
+	if [ "$isCrossRepository" = true ]; then
+		sed -i 's/^LDSHAREDLIBC=-lc$/LDSHAREDLIBC=-lroot/' Makefile
+	fi
+
 	make $jobArgs
 }
 
 INSTALL()
 {
-	make install
+	make DESTDIR=$installDestDir install
 
 	# remove static library
-	rm $libDir/libz.a
+	rm $installDestDir$libDir/libz.a
 
 	prepareInstalledDevelLib libz
 	fixPkgconfig
 
 	# devel package
 	packageEntries devel \
-		$developDir \
-		$documentationDir
+		$installDestDir$developDir \
+		$installDestDir$documentationDir
 }
 
 TEST()

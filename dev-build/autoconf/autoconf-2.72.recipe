@@ -48,6 +48,15 @@ BUILD_PREREQUIRES="
 	cmd:sed
 	cmd:cmp
 	"
+if [ "$targetArchitecture" = arm64 ]; then
+	BUILD_PREREQUIRES="
+		cmd:awk
+		cmd:m4
+		cmd:make
+		cmd:sed
+		cmd:cmp
+		"
+fi
 
 TEST_REQUIRES="
 	cmd:find
@@ -68,8 +77,14 @@ BUILD()
 
 INSTALL()
 {
-	make install
-	make install-html
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install DESTDIR="$installDestDir"
+	else
+		make install
+	fi
+	if [ "$targetArchitecture" != arm64 ]; then
+		make install-html
+	fi
 }
 
 TEST()

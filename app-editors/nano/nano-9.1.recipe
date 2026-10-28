@@ -50,7 +50,6 @@ BUILD_REQUIRES="
 	"
 BUILD_PREREQUIRES="
 	cmd:gcc$secondaryArchSuffix
-	cmd:groff
 	cmd:ld$secondaryArchSuffix
 	cmd:libtoolize$secondaryArchSuffix
 	cmd:make
@@ -60,10 +59,17 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	runConfigure --omit-dirs binDir ./configure --bindir=$commandBinDir
+	sed -i "s/ -ltinfo//g" src/Makefile
 	make $jobArgs
 }
 
 INSTALL()
 {
 	make install
+
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$commandBinDir"
+		cp -f "$sourceDir/src/nano" "$installDestDir$commandBinDir/nano"
+		ln -sf nano "$installDestDir$commandBinDir/rnano"
+	fi
 }

@@ -68,7 +68,6 @@ BUILD_PREREQUIRES="
 	cmd:autoconf
 	cmd:automake
 	cmd:autoheader
-	cmd:cut
 	cmd:gcc$secondaryArchSuffix
 	cmd:ld$secondaryArchSuffix
 	cmd:libtoolize$secondaryArchSuffix
@@ -84,9 +83,11 @@ TEST_REQUIRES="
 	cmd:sshd
 	"
 
+if [ "$targetArchitecture" != arm64 ]; then
 defineDebugInfoPackage curl$secondaryArchSuffix \
 	$binDir/curl \
 	$libDir/libcurl.so.$libVersion
+fi
 
 BUILD()
 {
@@ -111,10 +112,20 @@ BUILD()
 
 INSTALL()
 {
+	set -x
 	make install
 
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir" "$installDestDir$includeDir/curl" "$installDestDir$developLibDir/pkgconfig" "$installDestDir$libDir/pkgconfig" "$installDestDir$binDir"
+		cp -af "$sourceDir/lib/.libs/"libcurl.so* "$installDestDir$libDir/"
+		cp -af "$sourceDir/include/curl/." "$installDestDir$includeDir/curl/"
+		cp -f "$sourceDir/libcurl.pc" "$installDestDir$libDir/pkgconfig/"
+		cp -f "$sourceDir/src/.libs/curl" "$installDestDir$binDir/curl"
+		cp -f "$sourceDir/curl-config" "$installDestDir$binDir/curl-config"
+	fi
+
 	# remove libtool file
-	rm $libDir/libcurl.la
+	rm -f $libDir/libcurl.la
 
 	local MAJOR="`echo "$portVersion" | cut -d. -f1`"
 	local MIDDLE="`echo "$portVersion" | cut -d. -f2`"
@@ -125,8 +136,10 @@ INSTALL()
 		-e "s|@MINOR@|$MINOR|" \
 		$portDir/additional-files/curl.rdef > curl.rdef
 
+	if [ "$targetArchitecture" != arm64 ]; then
 	addResourcesToBinaries curl.rdef \
 		$binDir/curl
+	fi
 
 	# prepare develop/lib
 	prepareInstalledDevelLib libcurl
@@ -142,7 +155,7 @@ INSTALL()
 	# curl headers don't depend on the private libs
 	sed -i \
 		-e "s,Requires.private.*,," \
-		$developLibDir/pkgconfig/libcurl.pc
+		$installDestDir$developLibDir/pkgconfig/libcurl.pc
 
 	if [ -n "$secondaryArchSuffix" ]; then
 		maybe_manDir_man3=
@@ -151,11 +164,11 @@ INSTALL()
 	fi
 
 	# devel package
-	packageEntries devel \
-		$binDir/curl-config \
-		$dataDir/aclocal \
-		$developDir \
-		$maybe_manDir_man3
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel "$relativeBinDir/curl-config" "$relativeDevelopDir"
+	else
+		packageEntries devel "$binDir/curl-config" "$dataDir/aclocal" "$developDir" "$maybe_manDir_man3"
+	fi
 
 	# Remove stuff we don't need in the secondary architecture base package.
 	if [ -n "$secondaryArchSuffix" ]; then

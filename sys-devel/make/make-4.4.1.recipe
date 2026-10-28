@@ -8,7 +8,7 @@ that it is possible to use Make to build and install the program."
 HOMEPAGE="https://www.gnu.org/software/make/"
 COPYRIGHT="1988-2023 Free Software Foundation, Inc."
 LICENSE="GNU GPL v3"
-REVISION="1"
+REVISION="2"
 SOURCE_URI="http://ftpmirror.gnu.org/make/make-$portVersion.tar.gz
 	https://ftp.gnu.org/gnu/make/make-$portVersion.tar.gz"
 CHECKSUM_SHA256="dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3"
@@ -40,20 +40,30 @@ if [ "$recipeAction" = TEST ]; then
 		"
 fi
 
-defineDebugInfoPackage make \
-	$binDir/make
+if [ "$targetArchitecture" = arm64 ]; then
+	defineDebugInfoPackage --directory "$installDestDir$developDir/debug" make \
+		"$installDestDir$prefix/bin/make"
+else
+	defineDebugInfoPackage make "$binDir/make"
+fi
 
 BUILD()
 {
 	runConfigure ./configure \
 		--disable-rpath --with-gnu-ld --disable-dependency-tracking
 	./build.sh
-	./make
+	if [ "$targetArchitecture" != arm64 ]; then
+		./make
+	fi
 }
 
 INSTALL()
 {
-	./make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		DESTDIR="$installDestDir" make install
+	else
+		./make install
+	fi
 }
 
 TEST()

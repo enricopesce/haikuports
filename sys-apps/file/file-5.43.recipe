@@ -68,12 +68,17 @@ BUILD_PREREQUIRES="
 	cmd:sed
 	"
 
-defineDebugInfoPackage file$secondaryArchSuffix \
-	"$binDir"/file \
-	"$libDir"/libmagic.so.$libVersion
+if [ "$targetArchitecture" != arm64 ]; then
+	defineDebugInfoPackage file$secondaryArchSuffix \
+		"$binDir"/file \
+		"$libDir"/libmagic.so.$libVersion
+fi
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		export PATH="/work/host-tools/bin:$PATH"
+	fi
 	autoreconf
 	runConfigure ./configure
 	make
@@ -83,6 +88,12 @@ INSTALL()
 {
 	make install
 
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$binDir" "$installDestDir$libDir"
+		cp -f "$sourceDir/src/file" "$installDestDir$binDir/"
+		cp -af "$sourceDir"/src/.libs/libmagic.so* "$installDestDir$libDir/"
+	fi
+
 	# remove libtool file
 	rm -f $libDir/libmagic.la
 
@@ -90,8 +101,18 @@ INSTALL()
 	fixPkgconfig
 
 	if [ -z "$secondaryArchSuffix" ]; then
-		packageEntries data \
-			$dataDir
+		if [ "$targetArchitecture" = arm64 ]; then
+			mkdir -p "$installDestDir$prefix/$relativeDataDir/misc"
+			cp -f "$sourceDir/magic/magic.mgc" "$installDestDir$prefix/$relativeDataDir/misc/"
+			mkdir -p "$installDestDir$prefix/$relativeManDir/man1" "$installDestDir$prefix/$relativeManDir/man3" "$installDestDir$prefix/$relativeManDir/man4"
+			cp -f "$sourceDir/doc/file.1" "$installDestDir$prefix/$relativeManDir/man1/"
+			cp -f "$sourceDir/doc/libmagic.3" "$installDestDir$prefix/$relativeManDir/man3/"
+			cp -f "$sourceDir/doc/magic.4" "$installDestDir$prefix/$relativeManDir/man4/"
+			packageEntries data "$relativeDataDir"
+		else
+			packageEntries data \
+				$dataDir
+		fi
 		maybe_manDir_man3=$manDir/man3
 		rmdir $manDir/man5
 		sed -i -e "s,$dataDir/,/system/$relativeDataDir/,g" \
@@ -103,9 +124,14 @@ INSTALL()
 		rm -rf $dataDir $manDir
 	fi
 
-	packageEntries devel \
-		$developDir \
-		$maybe_manDir_man3
+	if [ "$targetArchitecture" = arm64 ]; then
+		maybe_manDir_man3=${maybe_manDir_man3#"$prefix"/}
+		packageEntries devel "$relativeDevelopDir" "$maybe_manDir_man3"
+	else
+		packageEntries devel \
+			$developDir \
+			$maybe_manDir_man3
+	fi
 }
 
 TEST()

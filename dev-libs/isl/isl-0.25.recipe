@@ -14,7 +14,7 @@ COPYRIGHT="2018-2019 Cerebras Systems
 	2008-2009 Katholieke Universiteit Leuven
 	2006-2007, 2012 Universiteit Leiden"
 LICENSE="MIT"
-REVISION="1"
+REVISION="2"
 SOURCE_URI="https://libisl.sourceforge.io/isl-$portVersion.tar.xz"
 CHECKSUM_SHA256="be7b210647ccadf90a2f0b000fca11a4d40546374a850db67adb32fad4b230d9"
 
@@ -56,29 +56,27 @@ BUILD_PREREQUIRES="
 	cmd:pkg_config$secondaryArchSuffix
 	"
 
-defineDebugInfoPackage isl$secondaryArchSuffix \
-	$libDir/libisl.so.$libVersion
+defineDebugInfoPackage --directory "$installDestDir$developDir/debug" isl$secondaryArchSuffix "$installDestDir$libDir/libisl.so.$libVersion"
 
 BUILD()
 {
 	autoreconf -vfi
-	runConfigure ./configure --disable-static
+	CC_FOR_BUILD="env -u LIBRARY_PATH -u CPATH gcc" CXX_FOR_BUILD="env -u LIBRARY_PATH -u CPATH g++" CC="$(getTargetArchitectureCommand gcc) --sysroot=$crossSysrootDir" runConfigure ./configure --disable-static
 	make $jobArgs
 }
 
 INSTALL()
 {
-	make install
+	make install DESTDIR="$installDestDir"
 
 	# remove libtool file
-	rm $libDir/libisl.la
+	rm -f "$installDestDir$libDir/libisl.la"
 
 	prepareInstalledDevelLib libisl
 	fixPkgconfig
 
 	# devel package
-	packageEntries devel \
-		$developDir
+	packageEntries devel "$installDestDir$developDir"
 }
 
 TEST()

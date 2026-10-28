@@ -1,0 +1,73 @@
+--- a/src/drivers/driver_bsd.c
++++ b/src/drivers/driver_bsd.c
+@@ -233,6 +233,10 @@
+ static int
+ bsd_get_if_media(void *priv)
+ {
++#ifdef __HAIKU__
++	(void)priv;
++	return 0;
++#else
+ 	struct bsd_driver_data *drv = priv;
+ 	struct ifmediareq ifmr;
+ 
+@@ -246,11 +250,17 @@
+ 	}
+ 
+ 	return ifmr.ifm_current;
++#endif
+ }
+ 
+ static int
+ bsd_set_if_media(void *priv, int media)
+ {
++#ifdef __HAIKU__
++	(void)priv;
++	(void)media;
++	return 0;
++#else
+ 	struct bsd_driver_data *drv = priv;
+ 	struct ifreq ifr;
+ 
+@@ -265,6 +275,7 @@
+ 	}
+ 
+ 	return 0;
++#endif
+ }
+ 
+ static int
+@@ -1618,6 +1629,10 @@
+ static enum ieee80211_opmode
+ get80211opmode(struct bsd_driver_data *drv)
+ {
++#ifdef __HAIKU__
++	(void)drv;
++	return IEEE80211_M_STA;
++#else
+ 	struct ifmediareq ifmr;
+ 
+ 	(void) memset(&ifmr, 0, sizeof(ifmr));
+@@ -1640,6 +1655,7 @@
+ #endif /* IEEE80211_M_MBSS */
+ 	}
+ 	return IEEE80211_M_STA;
++#endif
+ }
+ 
+ static void *
+--- a/src/utils/common.h
++++ b/src/utils/common.h
+@@ -56,9 +56,9 @@
+ #if defined(__HAIKU__)
+ #include <endian.h>
+ #include <net/if.h>
+-#define bswap_16 __swap_int16
+-#define bswap_32 __swap_int32
+-#define bswap_64 __swap_int64
++#define bswap_16 __builtin_bswap16
++#define bswap_32 __builtin_bswap32
++#define bswap_64 __builtin_bswap64
+ #endif /* __HAIKU__ */
+ 
+ #ifdef __rtems__

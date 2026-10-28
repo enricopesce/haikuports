@@ -75,19 +75,20 @@ BUILD_PREREQUIRES="
 	cmd:autoconf
 	cmd:autoheader
 	cmd:automake
-	cmd:autopoint
 	cmd:gcc$secondaryArchSuffix
 	cmd:ld$secondaryArchSuffix
 	cmd:libtoolize$secondaryArchSuffix
 	cmd:make
 	"
 
+if [ "$targetArchitecture" != "arm64" ]; then
 defineDebugInfoPackage xz_utils$secondaryArchSuffix \
 	"$commandBinDir"/lzmadec \
 	"$commandBinDir"/lzmainfo \
 	"$commandBinDir"/xz \
 	"$commandBinDir"/xzdec \
 	"$libDir"/liblzma.so.$libVersion
+fi
 
 BUILD()
 {
@@ -102,6 +103,13 @@ BUILD()
 INSTALL()
 {
 	make install
+	if [ "$targetArchitecture" = "arm64" ]; then
+		arm64Stage="$installDestDir$prefix"
+		mkdir -p "$arm64Stage/$relativeLibDir" "$arm64Stage/$relativeIncludeDir" "$arm64Stage/$relativeDevelopLibDir/pkgconfig"
+		cp -af "$sourceDir/src/liblzma/.libs/"liblzma.so* "$arm64Stage/$relativeLibDir/"
+		cp -af "$sourceDir/src/liblzma/api/." "$arm64Stage/$relativeIncludeDir/"
+		cp -af "$sourceDir/src/liblzma/liblzma.pc" "$arm64Stage/$relativeDevelopLibDir/pkgconfig/"
+	fi
 
 	# remove libtool file
 	rm -f $libDir/liblzma.la
@@ -115,8 +123,7 @@ INSTALL()
 
 	prepareInstalledDevelLibs liblzma
 	packageEntries devel \
-		$developDir \
-		$docDir
+		$relativeDevelopDir
 }
 
 TEST()

@@ -55,25 +55,37 @@ BUILD_PREREQUIRES="
 	cmd:make
 	"
 
-defineDebugInfoPackage gmp$secondaryArchSuffix \
-	$libDir/libgmp.so.$libgmpVersion \
-	$libDir/libgmpxx.so.$libgmpxxVersion
+if [ "$isCrossRepository" != true ]; then
+	defineDebugInfoPackage gmp$secondaryArchSuffix \
+		$libDir/libgmp.so.$libgmpVersion \
+		$libDir/libgmpxx.so.$libgmpxxVersion
+fi
 
 BUILD()
 {
 	touch doc/*.info*
 	autoreconf -fi
-	runConfigure ./configure --enable-cxx \
+	local crossArgs
+	if [ "$isCrossRepository" = true ]; then
+		crossArgs="--build=$buildMachineTriple --host=$targetMachineTriple"
+		export CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib"
+		export CXX="$targetMachineTriple-g++ -L$crossSysrootDir/boot/system/develop/lib"
+		export AR="$targetMachineTriple-ar"
+		export RANLIB="$targetMachineTriple-ranlib"
+	fi
+	runConfigure ./configure $crossArgs --enable-cxx \
 		--disable-static
 	make $jobArgs
 }
 
 INSTALL()
 {
-	make install includedir=$includeDir includeexecdir=$includeDir
+	make install DESTDIR=$installDestDir \
+		includedir=$includeDir \
+		includeexecdir=$includeDir
 
 	# remove libtool files
-	rm $libDir/*.la
+	rm $installDestDir$libDir/*.la
 
 	# prepare devel/lib
 	prepareInstalledDevelLibs libgmp libgmpxx
@@ -82,7 +94,7 @@ INSTALL()
 
 	# devel package
 	packageEntries devel \
-		$developDir
+		$installDestDir$developDir
 }
 
 TEST()

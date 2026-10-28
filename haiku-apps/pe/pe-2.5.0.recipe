@@ -48,21 +48,33 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
-	# This flag is used to choose gcc over Metrowerks PPC compiler,
-	# so it is needed everywhere but x86(-64).
-	jam -q -sOSPLAT=X86 -sDISTRO_DIR=distro
+	if [ "$targetArchitecture" = arm64 ]; then
+		sed -i "/You need to have pcre installed/d" build/BuildSettings
+		sed -i "s/LINKLIBS += -lnet ;/LINKLIBS += -lnetwork ;/" build/BuildSettings
+		sed -i "/MimeSet/d" build/OverriddenJamRules
+		local haikuIncludePath="$crossSysrootDir/boot/system/develop/headers/os:$crossSysrootDir/boot/system/develop/headers/os/support:$crossSysrootDir/boot/system/develop/headers/private/tracker"
+		C_INCLUDE_PATH="$haikuIncludePath:$C_INCLUDE_PATH" CPLUS_INCLUDE_PATH="$haikuIncludePath:$CPLUS_INCLUDE_PATH" jam -q -sOSPLAT=X86 -sDISTRO_DIR=distro -sOS=HAIKU -sIS_GCC_4_PLATFORM=1 -sCC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir" -sC++="$targetMachineTriple-g++ --sysroot=$crossSysrootDir" -sLINK="$targetMachineTriple-g++ --sysroot=$crossSysrootDir"
+	else
+		jam -q -sOSPLAT=X86 -sDISTRO_DIR=distro
+	fi
 }
 
 INSTALL()
 {
 	peDir=$appsDir/Pe
 
-	mkdir -p $appsDir
-	cp -a distro $peDir
-	cp -a doc $peDir/Documentation
-
-	mkdir $binDir
-	ln -sfn $peDir/lpe $binDir
-
-	addAppDeskbarSymlink $peDir/Pe
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$appsDir" "$installDestDir$binDir" "$installDestDir$dataDir/deskbar/menu/Applications"
+		cp -a distro "$installDestDir$peDir"
+		cp -a doc "$installDestDir$peDir/Documentation"
+		ln -sfn "$peDir/lpe" "$installDestDir$binDir/lpe"
+		symlinkRelative -s "$installDestDir$peDir/Pe" "$installDestDir$dataDir/deskbar/menu/Applications/Pe"
+	else
+		mkdir -p $appsDir
+		cp -a distro $peDir
+		cp -a doc $peDir/Documentation
+		mkdir $binDir
+		ln -sfn $peDir/lpe $binDir
+		addAppDeskbarSymlink $peDir/Pe
+	fi
 }

@@ -61,7 +61,9 @@ debugList=(
 if [ -z "$secondaryArchSuffix" ]; then
 	debugList+=("$binDir"/xmlwf)
 fi
-defineDebugInfoPackage expat$secondaryArchSuffix "${debugList[@]}"
+if [ "$targetArchitecture" != arm64 ]; then
+	defineDebugInfoPackage expat$secondaryArchSuffix "${debugList[@]}"
+fi
 
 BUILD()
 {
@@ -74,7 +76,15 @@ INSTALL()
 {
 	make install
 
-	rm $libDir/libexpat.la
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir/pkgconfig" "$installDestDir$includeDir"
+		cp -af "$sourceDir/lib/.libs/"libexpat.so* "$installDestDir$libDir/"
+		cp -f "$sourceDir/lib/expat.h" "$sourceDir/lib/expat_external.h" "$installDestDir$includeDir/"
+		cp -f "$sourceDir/expat_config.h" "$installDestDir$includeDir/"
+		cp -f "$sourceDir/expat.pc" "$installDestDir$libDir/pkgconfig/"
+	fi
+
+	rm -f $libDir/libexpat.la
 
 	# remove command and manual for secondary architecture
 	if [ -n "$secondaryArchSuffix" ]; then
@@ -85,13 +95,13 @@ INSTALL()
 	prepareInstalledDevelLib libexpat
 	fixPkgconfig
 
-	sed -i 's,${_IMPORT_PREFIX}/lib/lib',$libDir, \
-		$libDir/cmake/expat-$portVersion/expat-noconfig.cmake
 
 	# devel package
-	packageEntries devel \
-		$developDir \
-		$libDir/cmake
+	if [ "$targetArchitecture" = arm64 ]; then
+		packageEntries devel "$relativeDevelopDir"
+	else
+		packageEntries devel "$developDir" "$libDir/cmake"
+	fi
 }
 
 TEST()

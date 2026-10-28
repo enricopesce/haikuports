@@ -5,7 +5,7 @@ HOMEPAGE="https://github.com/westes/flex/"
 COPYRIGHT="2001-2007 The Flex Project
 	1990, 1997 The Regents of the University of California"
 LICENSE="Flex"
-REVISION="4"
+REVISION="5"
 SOURCE_URI="$HOMEPAGE/releases/download/v$portVersion/flex-$portVersion.tar.gz"
 CHECKSUM_SHA256="e87aae032bf07c26f85ac0ed3250998c37621d95f8bd748b31f15b33c45ee995"
 PATCHES="flex-$portVersion.patchset"
@@ -51,17 +51,38 @@ BUILD()
 	runConfigure ./configure \
 		--disable-rpath --with-gnu-ld --disable-shared \
 		--disable-dependency-tracking --disable-nls
-	make $jobArgs
+	if [ "$targetArchitecture" = arm64 ]; then
+		# The tarball ships a generated scanner; use it instead of running a host-built stage1flex.
+		python3 - <<'PY'
+from pathlib import Path
+p = Path("src/Makefile")
+s = p.read_text()
+old = "stage1scan.c: scan.l stage1flex$(EXEEXT)\n\t./stage1flex$(EXEEXT) $(AM_LFLAGS) $(LFLAGS) -o $@ $(srcdir)/scan.l"
+new = "stage1scan.c: scan.c\n\tcp $(srcdir)/scan.c $@"
+assert old in s, "Flex stage1 scanner rule not found"
+s = s.replace(old, new, 1)
+old = "noinst_PROGRAMS = stage1flex$(EXEEXT)"
+assert old in s, "Flex stage1 generator target not found"
+p.write_text(s.replace(old, "noinst_PROGRAMS =", 1))
+PY
+		env -u LIBRARY_PATH -u CPATH make $jobArgs
+	else
+		make $jobArgs
+	fi
 }
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		DESTDIR="$installDestDir" make install
+	else
+		make install
+	fi
 
-	rm $libDir/libfl.la
+	rm "$installDestDir$libDir/libfl.la"
 
 	# Create symlink to lex
-	ln -s $binDir/flex $binDir/lex
+	ln -s "$binDir/flex" "$installDestDir$binDir/lex"
 
 	# prepare develop/lib
 	prepareInstalledDevelLib libfl

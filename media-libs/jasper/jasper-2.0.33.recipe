@@ -46,23 +46,38 @@ if [ -z "$secondaryArchSuffix" ]; then
 		cmd:imgcmp$secondaryArchSuffix = $portVersion
 		cmd:imginfo$secondaryArchSuffix = $portVersion
 		cmd:jasper$secondaryArchSuffix = $portVersion
-		cmd:jiv$secondaryArchSuffix = $portVersion
 		"
-	REQUIRES_tools="
-		jasper$secondaryArchSuffix == $portVersion base
-		haiku$secondaryArchSuffix
-		lib:libGL$secondaryArchSuffix
-		lib:libglu$secondaryArchSuffix
-		lib:libjpeg$secondaryArchSuffix
-		"
+	if [ "$targetArchitecture" != arm64 ]; then
+		PROVIDES_tools+="cmd:jiv$secondaryArchSuffix = $portVersion"
+		REQUIRES_tools="
+			jasper$secondaryArchSuffix == $portVersion base
+			haiku$secondaryArchSuffix
+			lib:libGL$secondaryArchSuffix
+			lib:libglu$secondaryArchSuffix
+			lib:libjpeg$secondaryArchSuffix
+			"
+	else
+		REQUIRES_tools="
+			jasper$secondaryArchSuffix == $portVersion base
+			haiku$secondaryArchSuffix
+			lib:libjpeg$secondaryArchSuffix
+			"
+	fi
 fi
 
-BUILD_REQUIRES="
+if [ "$targetArchitecture" = arm64 ]; then
+	BUILD_REQUIRES="
 	haiku${secondaryArchSuffix}_devel
-	devel:libGL$secondaryArchSuffix
-	devel:libglu$secondaryArchSuffix
 	devel:libjpeg$secondaryArchSuffix
 	"
+else
+	BUILD_REQUIRES="
+		haiku${secondaryArchSuffix}_devel
+		devel:libGL$secondaryArchSuffix
+		devel:libglu$secondaryArchSuffix
+		devel:libjpeg$secondaryArchSuffix
+		"
+fi
 BUILD_PREREQUIRES="
 	cmd:cmake
 	cmd:gcc$secondaryArchSuffix
@@ -78,18 +93,25 @@ TEST_REQUIRES="
 BUILD()
 {
 	cmake -Bbuild -S. -DCMAKE_BUILD_TYPE=Release \
+		$([ "$targetArchitecture" = arm64 ] && echo -DCMAKE_C_COMPILER=aarch64-unknown-haiku-gcc -DCMAKE_CXX_COMPILER=aarch64-unknown-haiku-g++) \
 		$cmakeDirArgs \
 		-DCMAKE_INSTALL_DOCDIR=$documentationDir/packages/jasper \
 		-DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
 		-DJAS_ENABLE_AUTOMATIC_DEPENDENCIES=OFF \
 		-DCMAKE_SKIP_RPATH=ON \
-		-DJAS_ENABLE_OPENGL=ON
+		-DJAS_ENABLE_OPENGL=$([ "$targetArchitecture" = arm64 ] && echo OFF || echo ON)
 	make -C build
 }
 
 INSTALL()
 {
 	make -C build install
+	if [ "$targetArchitecture" = arm64 ]; then
+		mkdir -p "$installDestDir$libDir" "$installDestDir$binDir" 			"$installDestDir$prefix/$relativeDocumentationDir/packages/jasper"
+		cp -af "$sourceDir/build/src/libjasper/libjasper.so"* "$installDestDir$libDir/"
+		cp -f "$sourceDir/build/src/appl/jasper" "$sourceDir/build/src/appl/imginfo" 			"$sourceDir/build/src/appl/imgcmp" "$installDestDir$binDir/"
+		cp -f "$sourceDir/doc/README" "$sourceDir/doc/jasper.pdf" 			"$sourceDir/doc/jpeg2000.pdf" "$installDestDir$prefix/$relativeDocumentationDir/packages/jasper/"
+	fi
 
 	sed  -i "1i prefix=$prefix" \
 		$libDir/pkgconfig/jasper.pc
@@ -99,17 +121,17 @@ INSTALL()
 
 	# devel package
 	packageEntries devel \
-		$developDir
+		$relativeDevelopDir
 
 	# doc package
 	packageEntries doc \
-		$documentationDir/packages
+		$relativeDocumentationDir/packages
 
 	# tools package
 	if [ -z "$secondaryArchSuffix" ]; then
 		packageEntries tools \
-			$binDir \
-			$documentationDir
+			$relativeBinDir \
+			$relativeDocumentationDir
 	fi
 
 	# Remove stuff we don't need in the secondary architecture base package.

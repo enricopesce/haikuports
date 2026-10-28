@@ -16,7 +16,8 @@ SOURCE_URI="https://github.com/haiku/wpa_supplicant/archive/$srcGitRev.tar.gz"
 CHECKSUM_SHA256="e7e36b4ed5d6ff0e6a233b427b312c6984ab01d79e219d0d4b9c9e2ccf86f8ab"
 SOURCE_DIR="wpa_supplicant-$srcGitRev"
 PATCHES="wpa_supplicant-2.11-security.patchset
-	wpa_supplicant-2.11-gcc2.patch"
+	wpa_supplicant-2.11-gcc2.patch
+	wpa_supplicant-2.11-haiku-arm64.patch"
 
 ARCHITECTURES="all"
 
@@ -26,7 +27,7 @@ PROVIDES="
 	"
 REQUIRES="
 	haiku
-	lib:libssl
+	lib:libcrypto
 	"
 
 BUILD_REQUIRES="
@@ -42,17 +43,27 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	cd wpa_supplicant
-	make wpa_supplicant
+	if [ "$targetArchitecture" = arm64 ]; then
+		sed -i "s/#if defined(__linux__) || defined(__GLIBC__)/#if (defined(__linux__) || defined(__GLIBC__)) \&\& !defined(__HAIKU__)/" ../src/utils/common.h
+		sed -i 's/mimeset -F wpa_supplicant/true # skipped for cross-build on Linux host/' Makefile
+		local haikuHeaderFlags="-DETHER_ADDR_LEN=6 -DIFM_MMASK=0 -DIFM_IEEE80211_IBSS=0 -DIFM_IEEE80211_ADHOC=0 -DIFM_FLAG0=0 -DIFM_IEEE80211_11A=0 -DIFM_IEEE80211_11B=0 -DIFM_IEEE80211_11G=0 -DIFM_IEEE80211_11NA=0 -DIFM_IEEE80211_11NG=0 -DIFM_IEEE80211_HOSTAP=0 -DIFM_IEEE80211_MONITOR=0 -include $crossSysrootDir/boot/system/develop/headers/bsd/sys/ioccom.h -I$crossSysrootDir/boot/system/develop/headers/os -I$crossSysrootDir/boot/system/develop/headers/posix -I$crossSysrootDir/boot/system/develop/headers/private -I$crossSysrootDir/boot/system/develop/headers/private/net -I$crossSysrootDir/boot/system/develop/headers/private/libs/compat/freebsd_wlan -I$crossSysrootDir/boot/system/develop/headers/compatibility/bsd"
+		for headerDir in "$crossSysrootDir/boot/system/develop/headers/os/"*; do
+			[ -d "$headerDir" ] && haikuHeaderFlags+=" -I$headerDir"
+		done
+		make CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir" CXX="$targetMachineTriple-g++ --sysroot=$crossSysrootDir" LDO="$targetMachineTriple-g++ --sysroot=$crossSysrootDir" EXTRA_CFLAGS="$haikuHeaderFlags" wpa_supplicant
+	else
+		make wpa_supplicant
+	fi
 }
 
 INSTALL()
 {
 	cd wpa_supplicant
-	mkdir -p $binDir
-	cp -v wpa_supplicant $binDir
+	mkdir -p $installDestDir$binDir
+	cp -v wpa_supplicant $installDestDir$binDir
 
-	appSig=$(catattr -r BEOS:APP_SIG wpa_supplicant | cut -f2 -d"/")
-	localeFolder=$dataDir/locale/catalogs
+appSig=x-vnd.malinen-wpa_supplicant
+	localeFolder=$installDestDir$dataDir/locale/catalogs
 	mkdir -p $localeFolder/$appSig
 
 	for file in wpa_gui-haiku/locales/*.catkeys; do
