@@ -11,7 +11,7 @@ look at html5lib."
 HOMEPAGE="https://www.netsurf-browser.org/projects/hubbub/"
 COPYRIGHT="2007-2023 J-M Bell"
 LICENSE="MIT"
-REVISION="1"
+REVISION="2"
 SOURCE_URI="https://download.netsurf-browser.org/libs/releases/libhubbub-$portVersion-src.tar.gz"
 SOURCE_DIR="libhubbub-$portVersion"
 CHECKSUM_SHA256="8ac1e6f5f3d48c05141d59391719534290c59cd029efc249eb4fdbac102cd5a5"
@@ -56,13 +56,13 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
-	make PREFIX="$prefix" NSSHARED=/system/data/netsurf-buildsystem \
+	make PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem \
 			COMPONENT_TYPE=lib-shared
 }
 
 INSTALL()
 {
-	make PREFIX="$prefix" NSSHARED=/system/data/netsurf-buildsystem \
+	make PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem \
 			INCLUDEDIR=$relativeIncludeDir LIBDIR=$relativeLibDir \
 			COMPONENT_TYPE=lib-shared \
 			install
@@ -76,6 +76,6 @@ INSTALL()
 
 TEST()
 {
-	make PREFIX="$prefix" NSSHARED=/system/data/netsurf-buildsystem \
+	make PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem \
 		LDFLAGS="-liconv -lparserutils" test
 }
