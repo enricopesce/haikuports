@@ -1225,4 +1225,35 @@ index e3a6978..e7fbf06 100644
  #endif
 -- 
 2.56.0
+From c84d76d33b21250a705995db8821f8428950fdf4 Mon Sep 17 00:00:00 2001
+From: RenkuOS ARM64 maintainers <renkuos@example.invalid>
+Date: Thu, 29 Oct 2026 00:00:00 +0000
+Subject: Support Haiku ARM64 in Python cross configure
 
+Accept Haiku targets when generating the Python host platform tag.
+
+diff --git a/configure.ac b/configure.ac
+--- a/configure.ac
++++ b/configure.ac
+@@ -807,16 +807,19 @@
+ 	*-*-darwin*)
+ 		case "$host_cpu" in
+ 		arm*)
+ 			_host_ident=arm
+ 			;;
+ 		*)
+ 			_host_ident=$host_cpu
+ 		esac
++		;;
++	*-*-haiku*)
++		_host_ident=$host_cpu
+ 		;;
+ 	*-*-vxworks*)
+ 		_host_ident=$host_cpu
+ 		;;
+ 	*-*-emscripten)
+ 		_host_ident=$(emcc -dumpversion | cut -f1 -d-)-$host_cpu
+ 		;;
+ 	wasm32-*-* | wasm64-*-*)
+-- 
+2.56.0
