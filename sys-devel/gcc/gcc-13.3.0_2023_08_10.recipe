@@ -302,6 +302,11 @@ BUILD()
 		export CPPFLAGS="-I$crossSysrootDir/boot/system/develop/headers -I$sanitizerPrivateHeaders"
 		export EXTRA_CXXFLAGS="-I$sanitizerPrivateHeaders -I$sanitizerPrivateHeaders/system/arch/$targetArchitecture -I$sanitizerPrivateHeaders/system"
 		export LDFLAGS="-L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib"
+		if [ "$targetArchitecture" = "arm64" ]; then
+			# ARM64 Haiku keeps the unwinder in libgcc_eh.a. GCC's cross build
+			# otherwise links xgcc against libgcc.a alone via its C++ driver.
+			export HOST_LIBS="-lstdc++ -lgcc_eh"
+		fi
 		unset CPATH LIBRARY_PATH
 		export ac_cv_c_bigendian=no
 		export CC=$targetMachineTriple-gcc CXX=$targetMachineTriple-g++ AR=$targetMachineTriple-ar RANLIB=$targetMachineTriple-ranlib
