@@ -184,12 +184,19 @@ BUILD()
 		maybeEnableOptimizations=
 	fi
 
+	# Cross compiling Python 3.14 needs a native build interpreter of the same minor version.
+	buildPythonOption=
+	if [ -x /opt/python3.14/bin/python3.14 ]; then
+		buildPythonOption="--with-build-python=/opt/python3.14/bin/python3.14"
+	fi
+
 	runConfigure --omit-dirs binDir,includeDir ./configure \
 		--bindir=$commandBinDir \
 		--includedir=$developDir/headers \
 		$maybeEnableOptimizations \
 		--enable-shared \
 		--with-ensurepip=no \
+		$buildPythonOption \
 		--with-readline=editline \
 		--with-system-expat \
 		--with-system-libmpdec=no \
