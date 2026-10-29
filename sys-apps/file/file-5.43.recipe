@@ -76,10 +76,25 @@ fi
 
 BUILD()
 {
+	autoreconf
 	if [ "$targetArchitecture" = arm64 ]; then
+		local hostFileDir="/work/host-tools/file-$portVersion"
+		mkdir -p /work/host-tools/bin
+		if ! /work/host-tools/bin/file --version 2>/dev/null | grep -q "$portVersion"; then
+			rm -rf "$hostFileDir"
+			cp -a "$sourceDir" "$hostFileDir"
+			(
+				cd "$hostFileDir"
+				/usr/bin/make distclean >/dev/null 2>&1 || true
+				unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
+				unset CFLAGS CPPFLAGS LDFLAGS
+				CC=/usr/bin/gcc CXX=/usr/bin/g++ ./configure --disable-shared
+				/usr/bin/make $jobArgs
+			)
+			cp -f "$hostFileDir/src/file" /work/host-tools/bin/file
+		fi
 		export PATH="/work/host-tools/bin:$PATH"
 	fi
-	autoreconf
 	runConfigure ./configure
 	make
 }

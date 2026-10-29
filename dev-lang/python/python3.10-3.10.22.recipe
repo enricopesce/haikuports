@@ -238,7 +238,24 @@ fi
 BUILD()
 {
 	if [ "$targetArchitecture" = arm64 ]; then
-		export PYTHON_FOR_BUILD="_PYTHON_PROJECT_BASE=$PWD _PYTHON_HOST_PLATFORM=haiku-aarch64 PYTHONPATH=/work/host-tools/Python-3.10.22/build/lib.linux-x86_64-3.10:$PWD/build/lib.haiku-aarch64-3.10:$PWD/Lib _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__haiku_ /work/host-tools/Python-3.10.22/python"
+		local hostPythonDir="/work/host-tools/Python-$portVersion"
+		if [ ! -x "$hostPythonDir/python" ]; then
+			rm -rf "$hostPythonDir"
+			mkdir -p "${hostPythonDir%/*}"
+			cp -a "$sourceDir" "$hostPythonDir"
+			(
+				cd "$hostPythonDir"
+				/usr/bin/make distclean >/dev/null 2>&1 || true
+			)
+			(
+				cd "$hostPythonDir"
+				unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH
+				unset CFLAGS CPPFLAGS LDFLAGS
+				CC=/usr/bin/gcc CXX=/usr/bin/g++ ./configure --disable-shared --with-ensurepip=no
+				/usr/bin/make $jobArgs
+			)
+		fi
+		export PYTHON_FOR_BUILD="_PYTHON_PROJECT_BASE=$PWD _PYTHON_HOST_PLATFORM=haiku-aarch64 PYTHONPATH=$hostPythonDir/build/lib.linux-x86_64-3.10:$PWD/build/lib.haiku-aarch64-3.10:$PWD/Lib _PYTHON_SYSCONFIGDATA_NAME=_sysconfigdata__haiku_ $hostPythonDir/python"
 		export ac_cv_buggy_getaddrinfo=no
 		export ac_cv_file__dev_ptmx=no
 		export ac_cv_file__dev_ptc=no
@@ -279,6 +296,12 @@ BUILD()
 		maybeEnableOptimizations=
 	fi
 
+	local tzPath
+	if [ "$targetArchitecture" = arm64 ]; then
+		tzPath=/boot/system/data/zoneinfo
+	else
+		tzPath=$(findpaths -c : B_FIND_PATH_DATA_DIRECTORY zoneinfo)
+	fi
 	runConfigure --omit-dirs binDir,includeDir ./configure \
 		--bindir=$commandBinDir \
 		--includedir=$developDir/headers \
@@ -287,7 +310,7 @@ BUILD()
 		--with-ensurepip=no \
 		--with-readline=editline \
 		--with-system-expat \
-		--with-tzpath=$(findpaths -c : B_FIND_PATH_DATA_DIRECTORY zoneinfo) \
+		--with-tzpath="$tzPath" \
 		--without-static-libpython
 		# --with-lto # this one is too CPU/RAM intensive.
 

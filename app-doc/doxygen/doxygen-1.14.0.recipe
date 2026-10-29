@@ -61,7 +61,7 @@ TEST_REQUIRES="
 BUILD()
 {
 	cmake -Bbuild -S. -DCMAKE_BUILD_TYPE=Release \
-		$([ "$targetArchitecture" = arm64 ] && echo -DCMAKE_C_COMPILER=aarch64-unknown-haiku-gcc -DCMAKE_CXX_COMPILER=aarch64-unknown-haiku-g++) \
+		$([ "$targetArchitecture" = arm64 ] && echo -DCMAKE_C_COMPILER=aarch64-unknown-haiku-gcc -DCMAKE_CXX_COMPILER=aarch64-unknown-haiku-g++ -DCMAKE_SYSROOT="$crossSysrootDir") \
 		$([ "$targetArchitecture" = arm64 ] && echo -DIconv_LIBRARY=$crossSysrootDir/boot/system/develop/lib/libiconv.so -DIconv_INCLUDE_DIR=$crossSysrootDir/boot/system/develop/headers) \
 		$cmakeDirArgs \
 		-DCMAKE_INSTALL_BINDIR=$prefix/bin \

@@ -97,8 +97,7 @@ BUILD()
 	local crossArgs
 	if [ "$isCrossRepository" = true ]; then
 		crossArgs="--build=$buildMachineTriple --host=$targetMachineTriple --target=$targetMachineTriple"
-		export CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib"
-		export CXX="$targetMachineTriple-g++ -L$crossSysrootDir/boot/system/develop/lib"
+		export CXX="$targetMachineTriple-g++ --sysroot=$crossSysrootDir -L$crossSysrootDir/boot/system/develop/lib"
 		export AR="$targetMachineTriple-ar"
 		export RANLIB="$targetMachineTriple-ranlib"
 	fi

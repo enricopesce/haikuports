@@ -34,6 +34,7 @@ PROVIDES="
 	"
 REQUIRES="
 	haiku$secondaryArchSuffix
+	lib:libiconv$secondaryArchSuffix
 	"
 if [ "$targetArchitecture" = x86_gcc2 ]; then
 	REPLACES="
@@ -43,6 +44,7 @@ fi
 
 BUILD_REQUIRES="
 	haiku${secondaryArchSuffix}_devel
+	devel:libiconv$secondaryArchSuffix
 	"
 BUILD_PREREQUIRES="
 	cmd:automake
@@ -82,7 +84,8 @@ BUILD()
 		yearArg="--disable-year2038"
 	fi
 
-	CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib" AR="$targetMachineTriple-ar" runConfigure --omit-dirs binDir ./configure --bindir=$commandBinDir $crossArgs \
+	export LIBS="-liconv"
+	CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir -L$crossSysrootDir/boot/system/develop/lib" AR="$targetMachineTriple-ar" runConfigure --omit-dirs binDir ./configure --bindir=$commandBinDir $crossArgs \
 		--disable-nls \
 		--disable-gcc-warnings \
 		LDFLAGS="-lnetwork" CFLAGS="-D_BSD_SOURCE" \

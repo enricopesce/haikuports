@@ -80,6 +80,10 @@ BUILD()
 		export CC_FOR_BUILD=/usr/bin/cc
 		./autosetup/autosetup-find-tclsh
 	)
+	if [ "$targetArchitecture" = arm64 ]; then
+		export CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir"
+		export CXX="$targetMachineTriple-c++ --sysroot=$crossSysrootDir"
+	fi
 	export CPPFLAGS="$sqliteCPPFLAGS"
 	./configure --build=$buildMachineTriple --host=$targetMachineTriple \
 		--prefix=$prefix \

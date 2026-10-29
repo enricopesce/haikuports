@@ -117,7 +117,7 @@ BUILD()
 	if [ -n "$secondaryArchSuffix" ]; then
 		configureArgs="--without-progs"
 	elif [ "$targetArchitecture" = arm64 ]; then
-		configureArgs="--with-build-cc=/usr/bin/gcc --without-libtool --with-shared --with-cxx-shared"
+		configureArgs="--with-build-cc=/usr/bin/gcc --without-libtool --with-shared --with-cxx-shared --without-normal"
 		unset CPATH LIBRARY_PATH
 		BUILD_CC=/usr/bin/gcc
 		export BUILD_CC

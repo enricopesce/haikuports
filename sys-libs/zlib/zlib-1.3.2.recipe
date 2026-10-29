@@ -58,7 +58,7 @@ BUILD()
 	export mandir=$manDir # ./configure won't accept --mandir, but respects $mandir
 	export CFLAGS="-O2 -g -DNDEBUG" # similar to cmake's "RelWithDebugInfo" as used before.
 	if [ "$isCrossRepository" = true ]; then
-		export CC=$targetMachineTriple-gcc AR=$targetMachineTriple-ar RANLIB=$targetMachineTriple-ranlib
+		export CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir" AR=$targetMachineTriple-ar RANLIB=$targetMachineTriple-ranlib
 		export LDFLAGS="-L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib"
 	fi
 

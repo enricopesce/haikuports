@@ -138,8 +138,8 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	if [ "$targetArchitecture" = arm64 ]; then
-		CC="/work/toolchain/host-gcc-arm64/bin/aarch64-unknown-haiku-gcc --sysroot=$crossSysrootDir"
-		CXX="/work/toolchain/host-gcc-arm64/bin/aarch64-unknown-haiku-g++ --sysroot=$crossSysrootDir"
+		CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir"
+		CXX="$targetMachineTriple-g++ --sysroot=$crossSysrootDir"
 		CPPFLAGS="-I$crossSysrootDir/boot/system/develop/headers -I$crossSysrootDir/boot/system/develop/headers/posix ${CPPFLAGS:-}"
 		LDFLAGS="${LDFLAGS:-} -L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib"
 		export CC CXX CPPFLAGS LDFLAGS

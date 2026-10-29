@@ -44,7 +44,7 @@ TEST_REQUIRES="
 BUILD()
 {
 	if [ "$isCrossRepository" = true ]; then
-		make -f unix/Makefile MU MANDIR=$manDir CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib" CFLAGS=" -O3 -DLARGE_FILE_SUPPORT -DUNICODE_SUPPORT -DUNICODE_WCHAR -DICONV_MAPPING -DUTF8_MAYBE_NATIVE -DNO_LCHMOD -DHAVE_DIRENT_H -DHAVE_TERMIOS_H -D_MBCS -DNO_SYSDIR -DBZIP2_SUPPORT" CRCA_O="" AS="$targetMachineTriple-gcc -c" LF2="-lbe -liconv -lbz2 -s" CC_BZ="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib" CFLAGS_BZ="-O3" LN="ln -s"
+		make -f unix/Makefile MU MANDIR=$manDir CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir -L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib" CFLAGS=" -O3 -DLARGE_FILE_SUPPORT -DUNICODE_SUPPORT -DUNICODE_WCHAR -DICONV_MAPPING -DUTF8_MAYBE_NATIVE -DNO_LCHMOD -DHAVE_DIRENT_H -DHAVE_TERMIOS_H -D_MBCS -DNO_SYSDIR -DBZIP2_SUPPORT" CRCA_O="" AS="$targetMachineTriple-gcc -c" LF2="-lbe -liconv -lbz2 -s" CC_BZ="$targetMachineTriple-gcc --sysroot=$crossSysrootDir -L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib" CFLAGS_BZ="-O3" LN="ln -s"
 	else
 		make -f unix/Makefile haiku MANDIR=$manDir LN="ln -s"
 	fi

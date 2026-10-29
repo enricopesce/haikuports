@@ -72,8 +72,8 @@ fi
 BUILD()
 {
 	make clean
-	make $jobArgs -f Makefile-libbz2_so CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib" AR=$targetMachineTriple-ar
-	make $jobArgs CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib" AR=$targetMachineTriple-ar libbz2.a bzip2 bzip2recover
+	make $jobArgs -f Makefile-libbz2_so CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir -L$crossSysrootDir/boot/system/develop/lib" AR=$targetMachineTriple-ar
+	make $jobArgs CC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir -L$crossSysrootDir/boot/system/develop/lib" AR=$targetMachineTriple-ar libbz2.a bzip2 bzip2recover
 		# shared libary not built by default
 }
 

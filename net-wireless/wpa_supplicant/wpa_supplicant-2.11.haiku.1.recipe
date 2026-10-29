@@ -46,7 +46,10 @@ BUILD()
 	if [ "$targetArchitecture" = arm64 ]; then
 		sed -i "s/#if defined(__linux__) || defined(__GLIBC__)/#if (defined(__linux__) || defined(__GLIBC__)) \&\& !defined(__HAIKU__)/" ../src/utils/common.h
 		sed -i 's/mimeset -F wpa_supplicant/true # skipped for cross-build on Linux host/' Makefile
-		local haikuHeaderFlags="-DETHER_ADDR_LEN=6 -DIFM_MMASK=0 -DIFM_IEEE80211_IBSS=0 -DIFM_IEEE80211_ADHOC=0 -DIFM_FLAG0=0 -DIFM_IEEE80211_11A=0 -DIFM_IEEE80211_11B=0 -DIFM_IEEE80211_11G=0 -DIFM_IEEE80211_11NA=0 -DIFM_IEEE80211_11NG=0 -DIFM_IEEE80211_HOSTAP=0 -DIFM_IEEE80211_MONITOR=0 -include $crossSysrootDir/boot/system/develop/headers/bsd/sys/ioccom.h -I$crossSysrootDir/boot/system/develop/headers/os -I$crossSysrootDir/boot/system/develop/headers/posix -I$crossSysrootDir/boot/system/develop/headers/private -I$crossSysrootDir/boot/system/develop/headers/private/net -I$crossSysrootDir/boot/system/develop/headers/private/libs/compat/freebsd_wlan -I$crossSysrootDir/boot/system/develop/headers/compatibility/bsd"
+		local haikuHeaderFlags="-DETHER_ADDR_LEN=6 -DMD5_MAC_LEN=16 -DIFM_MMASK=0 -DIFM_IEEE80211_IBSS=0 -DIFM_IEEE80211_ADHOC=0 -DIFM_FLAG0=0 -DIFM_IEEE80211_11A=0 -DIFM_IEEE80211_11B=0 -DIFM_IEEE80211_11G=0 -DIFM_IEEE80211_11NA=0 -DIFM_IEEE80211_11NG=0 -DIFM_IEEE80211_HOSTAP=0 -DIFM_IEEE80211_MONITOR=0 -include $crossSysrootDir/boot/system/develop/headers/bsd/sys/ioccom.h -I$crossSysrootDir/boot/system/develop/headers/os -I$crossSysrootDir/boot/system/develop/headers/posix -I$crossSysrootDir/boot/system/develop/headers/private -I$crossSysrootDir/boot/system/develop/headers/private/net -I$crossSysrootDir/boot/system/develop/headers/private/libs/compat/freebsd_wlan -I$crossSysrootDir/boot/system/develop/headers/compatibility/bsd"
+		if [ -n "${HAIKU_SOURCE_DIR:-}" ]; then
+			haikuHeaderFlags+=" -I$HAIKU_SOURCE_DIR/src/libs/compat/freebsd_wlan"
+		fi
 		for headerDir in "$crossSysrootDir/boot/system/develop/headers/os/"*; do
 			[ -d "$headerDir" ] && haikuHeaderFlags+=" -I$headerDir"
 		done

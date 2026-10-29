@@ -114,7 +114,7 @@ if $pythonModuleEnabled; then
 		"
 fi
 BUILD_PREREQUIRES="
-	lib:libicudata$secondaryArchSuffix
+	lib:libicudata$secondaryArchSuffix >= 77
 	cmd:aclocal
 	cmd:autoconf
 	cmd:automake

@@ -63,6 +63,14 @@ BUILD()
 	cd glib
 	autoreconf -i -f
 	cd ..
+	# Cache the target-only test for cross builds: AArch64/Haiku grows
+	# the stack down, so configure must not try to execute a target binary.
+	if [ "$targetArchitecture" = arm64 ]; then
+		export glib_cv_stack_grows=no
+		export glib_cv_uscore=no
+		export ac_cv_func_posix_getpwuid_r=yes
+		export ac_cv_func_posix_getgrgid_r=yes
+	fi
 	# do the needful...
 	autoreconf -i -f
 	automake --add-missing

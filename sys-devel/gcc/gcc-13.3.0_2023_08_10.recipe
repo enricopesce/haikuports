@@ -228,18 +228,22 @@ debugList=(
 	"$installDir/bin"/gcov-dump
 	"$installDir/bin"/gcov-tool
 	"$installDir/bin"/lto-dump
-	"$(getPackagePrefix fortran)/$relativeInstallDir"/bin/gfortran
-	"$(getPackagePrefix fortran)/$relativeInstallDir/$gccLibDir"/f951
-	"$(getPackagePrefix jit)/$relativeLibDir"/libgccjit.so.$libgccjitLibVersion
 	"$(getPackagePrefix syslibs)/$relativeLibDir"/libasan.so.$libasanLibVersion
 	"$(getPackagePrefix syslibs)/$relativeLibDir"/libatomic.so.$libatomicLibVersion
 	"$(getPackagePrefix syslibs)/$relativeLibDir"/libgcc_s.so.$libgccSoVersion
-	"$(getPackagePrefix syslibs)/$relativeLibDir"/libgfortran.so.$libgfortranLibVersion
 	"$(getPackagePrefix syslibs)/$relativeLibDir"/libgomp.so.$libgompLibVersion
 	"$(getPackagePrefix syslibs)/$relativeLibDir"/libssp.so.$libsspLibVersion
 	"$(getPackagePrefix syslibs)/$relativeLibDir"/libstdc++.so.$libstdcxxLibVersion
 	"$(getPackagePrefix syslibs)/$relativeLibDir"/libubsan.so.$libubsanLibVersion
 	)
+if [ "$targetArchitecture" != "arm64" ]; then
+	debugList+=(
+		"$(getPackagePrefix fortran)/$relativeInstallDir"/bin/gfortran
+		"$(getPackagePrefix fortran)/$relativeInstallDir/$gccLibDir"/f951
+		"$(getPackagePrefix jit)/$relativeLibDir"/libgccjit.so.$libgccjitLibVersion
+		"$(getPackagePrefix syslibs)/$relativeLibDir"/libgfortran.so.$libgfortranLibVersion
+	)
+fi
 if $targetHasLibquadmath; then
 	debugList+=(
 		"$(getPackagePrefix syslibs)/$relativeLibDir"/libquadmath.so.$libquadmathLibVersion
@@ -252,6 +256,12 @@ fi
 
 BUILD()
 {
+	gccLanguages="c,c++,fortran,jit,objc"
+	if [ "$targetArchitecture" = "arm64" ]; then
+		# Build ARM64 Fortran and JIT frontends from the GCC sources.
+		gccLanguages="c,c++,fortran,jit"
+	fi
+
 	if [ "$HAIKU_RESUME_BUILD" != "1" ]; then
 		rm -rf $objectsDir
 	fi
@@ -281,13 +291,22 @@ BUILD()
 		buildConfigureFlags="--build=$buildMachineTriple --host=$targetMachineTriple --target=$targetMachineTriple"
 		sanitizerConfigureFlag=--disable-libsanitizer
 		crossConfigureFlags="--disable-bootstrap --disable-libobjc --with-gmp=$crossSysrootDir/boot/system/develop --with-mpfr=$crossSysrootDir/boot/system/develop --with-mpc=$crossSysrootDir/boot/system/develop"
+		# Haiku's cross-toolchain renames its bootstrap libstdc++ archive.
+		# GCC's target-side configure probes link with -lstdc++, so expose the
+		# archive under the standard linker name for this port build.
+		local bootstrapStdCxxArchive=$("$targetMachineTriple-g++" -print-file-name=libstdc++-static.a)
+		if [ -f "$bootstrapStdCxxArchive" ]; then
+			ln -sf "$bootstrapStdCxxArchive" "$(dirname "$bootstrapStdCxxArchive")/libstdc++.a"
+		fi
 		local sanitizerPrivateHeaders="$crossSysrootDir/boot/system/develop/headers/private"
 		export CPPFLAGS="-I$crossSysrootDir/boot/system/develop/headers -I$sanitizerPrivateHeaders"
 		export EXTRA_CXXFLAGS="-I$sanitizerPrivateHeaders -I$sanitizerPrivateHeaders/system/arch/$targetArchitecture -I$sanitizerPrivateHeaders/system"
 		export LDFLAGS="-L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib"
+		unset CPATH LIBRARY_PATH
 		export ac_cv_c_bigendian=no
 		export CC=$targetMachineTriple-gcc CXX=$targetMachineTriple-g++ AR=$targetMachineTriple-ar RANLIB=$targetMachineTriple-ranlib
 	fi
+
 
 	 "$sourceDir/configure" \
 	$buildConfigureFlags \
@@ -295,7 +314,7 @@ BUILD()
 		--docdir=$docDir --enable-threads=posix \
 		--disable-nls --enable-shared --with-gnu-ld --with-gnu-as \
 		--enable-version-specific-runtime-libs \
-		--enable-languages=c,c++,fortran,jit,objc --enable-lto \
+		--enable-languages=$gccLanguages --enable-lto \
 		--enable-frame-pointer \
 		--with-pkgversion=$(echo $portVersion | cut -d_ -f2-) \
 		--enable-__cxa-atexit --with-system-zlib --enable-checking=release \
@@ -303,6 +322,7 @@ BUILD()
 		--with-default-libstdcxx-abi=gcc4-compatible \
 		--enable-libssp $sanitizerConfigureFlag --enable-host-shared \
 		$additionalConfigureFlags $crossConfigureFlags
+
 
 	make $jobArgs
 
@@ -402,25 +422,7 @@ INSTALL()
 	make install
 	make install-html
 
-	# Cross installs may omit the Fortran frontend even when it was built.
-	if [ "$targetArchitecture" = "arm64" ] && [ ! -e "$installDestDir$prefix/$relativeInstallDir/$gccLibDir/f951" ]; then
-		mkdir -p "$installDestDir$prefix/$relativeInstallDir/$gccLibDir"
-		cp $objectsDir/gcc/f951 "$installDestDir$prefix/$relativeInstallDir/$gccLibDir/f951"
-	fi
-
-	if [ "$targetArchitecture" = "arm64" ] && [ ! -e "$installDestDir$prefix/develop/lib/libgfortran.a" ]; then
-		mkdir -p "$installDestDir$prefix/develop/lib"
-		cp $objectsDir/$effectiveTargetMachineTriple/libgfortran/.libs/libgfortran.a "$installDestDir$prefix/develop/lib/libgfortran.a"
-	fi
-	fortranInstallDir="$installDestDir$prefix/$relativeInstallDir/$gccLibDir"
-	if [ "$targetArchitecture" = "arm64" ]; then
-		if [ ! -e "$fortranInstallDir/libcaf_single.a" ]; then
-			cp $objectsDir/$effectiveTargetMachineTriple/libgfortran/.libs/libcaf_single.a "$fortranInstallDir/libcaf_single.a"
-		fi
-		if [ ! -e "$fortranInstallDir/libgfortran.spec" ]; then
-			cp $objectsDir/$effectiveTargetMachineTriple/libgfortran/libgfortran.spec "$fortranInstallDir/libgfortran.spec"
-		fi
-	fi
+	# ARM64 bootstrap GCC is built without a Fortran frontend or runtime.
 
 	### HTML documentation ####################################
 
@@ -478,22 +480,22 @@ INSTALL()
 		$gccLibDir
 	rm $gccLibDir/libatomic*.a
 
-	# libgccjit
-	mv $installDir/lib/libgccjit.so \
-		$installDir/lib/libgccjit.so.$libgccjitSoVersion \
-		$installDir/lib/libgccjit.so.$libgccjitLibVersion \
-		$libDir/
+		# libgccjit
+		mv $installDir/lib/libgccjit.so \
+			$installDir/lib/libgccjit.so.$libgccjitSoVersion \
+			$installDir/lib/libgccjit.so.$libgccjitLibVersion \
+			$libDir/
 
-	# libgfortran
-	mv $gccLibDir/libgfortran.so \
-		$gccLibDir/libgfortran.so.$libgfortranSoVersion \
-		$gccLibDir/libgfortran.so.$libgfortranLibVersion \
-		$libDir/
-	ln -s $libDir/libgfortran.so \
-		$libDir/libgfortran.so.$libgfortranSoVersion \
-		$libDir/libgfortran.so.$libgfortranLibVersion \
-		$gccLibDir
-	mv $gccLibDir/libgfortran*.a $developLibDir/
+		# libgfortran
+		mv $gccLibDir/libgfortran.so \
+			$gccLibDir/libgfortran.so.$libgfortranSoVersion \
+			$gccLibDir/libgfortran.so.$libgfortranLibVersion \
+			$libDir/
+		ln -s $libDir/libgfortran.so \
+			$libDir/libgfortran.so.$libgfortranSoVersion \
+			$libDir/libgfortran.so.$libgfortranLibVersion \
+			$gccLibDir
+		mv $gccLibDir/libgfortran*.a $developLibDir/
 
 	# libgomp
 	mv $gccLibDir/libgomp.so \
@@ -616,8 +618,9 @@ INSTALL()
 		fi
 	done
 	for f in cc1 cc1obj cc1plus collect2 f951 g++-mapper-server lto1 lto-wrapper ; do
-		addattr SYS:ENV DISABLE_ASLR=1 \
-			$gccLibDir/$f
+		if [ -e "$gccLibDir/$f" ]; then
+			addattr SYS:ENV DISABLE_ASLR=1 "$gccLibDir/$f"
+		fi
 	done
 
 	### Symlinks ##############################################
@@ -669,32 +672,19 @@ INSTALL()
 
 	### Sub Packages ##########################################
 
-if [ "$targetArchitecture" != "arm64" ]; then
 if [ -d "$installDestDir$prefix/$relativeInstallDir/$gccLibDir/finclude" ]; then
 	packageEntries "fortran" $relativeInstallDir/$gccLibDir/finclude
 fi
 	packageEntries "fortran" "$developDir/tools$secondaryArchSubDir/bin/"*gfortran
-fi
-	packageEntries "fortran" \
-		$relativeBinDir/gfortran \
-		$relativeInstallDir/$gccLibDir/f951 \
-		$relativeInstallDir/$gccLibDir/libcaf_single.a \
-		develop/lib/libgfortran.a \
-		$relativeInstallDir/$gccLibDir/libgfortran.spec
+		packageEntries "fortran" \
+			$relativeBinDir/gfortran \
+			$relativeInstallDir/$gccLibDir/f951 \
+			$relativeInstallDir/$gccLibDir/libcaf_single.a \
+			develop/lib/libgfortran.a \
+			$relativeInstallDir/$gccLibDir/libgfortran.spec
 
 	rm -rf $installDir/$gccLibDir/{f951, finclude, libcaf_single*, libgfortran*}
 
-if [ "$targetArchitecture" != "arm64" ]; then
-	packageEntries "jit" \
-		$relativeLibDir/libgccjit.so \
-		$relativeLibDir/libgccjit.so.$libgccjitSoVersion \
-		$relativeLibDir/libgccjit.so.$libgccjitLibVersion
-
-	packageEntries "jit_devel" \
-		develop/lib/libgccjit.so* \
-		$relativeIncludeDir/libgccjit.h \
-		$relativeIncludeDir/libgccjit++.h
-fi
 
 if [ "$targetArchitecture" != "arm64" ]; then
 	packageEntries "syslibs" \
@@ -758,9 +748,6 @@ fi
 		$relativeLibDir/libatomic.so.$libatomicLibVersion \
 		$relativeLibDir/libgcc_s.so \
 		$relativeLibDir/libgcc_s.so.$libgccSoVersion \
-		$relativeLibDir/libgfortran.so \
-		$relativeLibDir/libgfortran.so.$libgfortranSoVersion \
-		$relativeLibDir/libgfortran.so.$libgfortranLibVersion \
 		$relativeLibDir/libgomp.so \
 		$relativeLibDir/libgomp.so.$libgompSoVersion \
 		$relativeLibDir/libgomp.so.$libgompLibVersion \
@@ -771,6 +758,11 @@ fi
 		$relativeLibDir/libstdc++.so.$libstdcxxSoVersion \
 		$relativeLibDir/libstdc++.so.$libstdcxxLibVersion \
 		$relativeLibDir/libsupc++.so
+		packageEntries "syslibs" \
+			$relativeLibDir/libgfortran.so \
+			$relativeLibDir/libgfortran.so.$libgfortranSoVersion \
+			$relativeLibDir/libgfortran.so.$libgfortranLibVersion
+
 	if $targetHasLibquadmath; then
 		packageEntries "syslibs" \
 			$relativeLibDir/libquadmath.so \
@@ -814,6 +806,23 @@ fi
 		fi
 		[ -d "$arm64RuntimeHeaderDir/gcc" ] || { echo "ARM64 GCC headers staging failed" >&2; exit 1; }
 	fi
+
+	packageEntries "jit" \
+		$relativeLibDir/libgccjit.so \
+		$relativeLibDir/libgccjit.so.$libgccjitSoVersion \
+		$relativeLibDir/libgccjit.so.$libgccjitLibVersion
+
+	# The syslibs packaging stage may consume the generic developer symlinks.
+	# Recreate the JIT development links in the main staging root before splitting.
+	mkdir -p "$installDestDir$prefix/develop/lib"
+	for jitLibrary in libgccjit.so libgccjit.so.$libgccjitSoVersion libgccjit.so.$libgccjitLibVersion; do
+		ln -sfn "../../lib/$jitLibrary" "$installDestDir$prefix/develop/lib/$jitLibrary"
+	done
+	packageEntries "jit_devel" \
+		"$installDestDir$prefix/develop/lib"/libgccjit.so* \
+		$relativeIncludeDir/libgccjit.h \
+		$relativeIncludeDir/libgccjit++.h
+
 
 	packageEntries "syslibs_devel" \
 		"$installDestDir$prefix/develop/lib"/*.so* \

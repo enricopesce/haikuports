@@ -24,13 +24,19 @@ CHECKSUM_SHA256="5663bf33e979381f470c2f4055c3b162e0abe41bdd6c5dccefd8d8775780bcc
 SOURCE_DIR="doxygen-Release_${portVersion//./_}"
 ADDITIONAL_FILES="doxygen.rdef.in"
 
-ARCHITECTURES="all !x86_gcc2"
+ARCHITECTURES="all !x86_gcc2 !arm64"
 SECONDARY_ARCHITECTURES="x86"
 
-PROVIDES="
-	doxygen_gui$secondaryArchSuffix
-	cmd:doxywizard = $portVersion
-	"
+if [ "$targetArchitecture" = arm64 ]; then
+	# Qt 6 is not available in the ARM64 cross repository; omit this optional
+	# GUI package so the CLI doxygen build does not pull in an impossible port.
+	PROVIDES=""
+else
+	PROVIDES="
+		doxygen_gui$secondaryArchSuffix
+		cmd:doxywizard = $portVersion
+		"
+fi
 REQUIRES="
 	haiku$secondaryArchSuffix
 	cmd:doxygen

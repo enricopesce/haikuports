@@ -162,7 +162,6 @@ BUILD()
 	local crossArgs
 	if [ "$isCrossRepository" = true ]; then
 		crossArgs="--build=$buildMachineTriple --host=$targetMachineTriple"
-		export CC="$targetMachineTriple-gcc -L$crossSysrootDir/boot/system/develop/lib"
 		export AR="$targetMachineTriple-ar"
 	fi
 	runConfigure ./configure $crossArgs 		--enable-relocatable 		--enable-shared 		--disable-static 		--disable-nls 		--enable-extra-encodings

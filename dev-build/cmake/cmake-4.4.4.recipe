@@ -96,14 +96,11 @@ BUILD()
 
 	if [ "$targetArchitecture" = "arm64" ]; then
 		local buildDir="$sourceDir/arm64-build"
-		# CMake expects the legacy Haiku include alias, while the sysroot stores OS.h under os/kernel.
-		mkdir -p "$crossSysrootDir/boot/system/develop/headers/be/kernel"
-		ln -sf ../../os/kernel/OS.h "$crossSysrootDir/boot/system/develop/headers/be/kernel/OS.h"
 		/usr/bin/cmake -S "$sourceDir" -B "$buildDir" -G "Unix Makefiles" \
 			-DCMAKE_SYSTEM_NAME=Haiku \
 			-DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-			-DCMAKE_C_COMPILER=/work/toolchain/cross-tools-arm64/bin/aarch64-unknown-haiku-gcc \
-			-DCMAKE_CXX_COMPILER=/work/toolchain/cross-tools-arm64/bin/aarch64-unknown-haiku-g++ \
+			-DCMAKE_C_COMPILER="$targetMachineTriple-gcc" \
+			-DCMAKE_CXX_COMPILER="$targetMachineTriple-g++" \
 			-DCMAKE_SYSROOT="$crossSysrootDir" \
 			-DCMAKE_FIND_ROOT_PATH="$crossSysrootDir" \
 			-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
