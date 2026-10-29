@@ -46,6 +46,7 @@ BUILD()
 		# already resolved libexpat's target development package for this build.
 		perl -0777 -i -pe 's/unless \(\s*check_lib\(.*?\n\) \{/if (0) {/s or die "could not disable host-only Expat probe\n"' Makefile.PL
 		perl Makefile.PL PREFIX=$prefix \
+			CC=$targetMachineTriple-gcc LD=$targetMachineTriple-gcc \
 			EXPATLIBPATH=$crossSysrootDir/boot/system/develop/lib \
 			EXPATINCPATH=$crossSysrootDir/boot/system/develop/headers
 	else
