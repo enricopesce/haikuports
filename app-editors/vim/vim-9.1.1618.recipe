@@ -93,9 +93,11 @@ BUILD()
 
 	if [ "$targetArchitecture" = arm64 ]; then
 		pythonInterpArgs="--enable-python3interp=no"
+		rubyInterpArgs="--enable-rubyinterp=no"
 		export CFLAGS="-fPIC -O2"
 	else
 		pythonInterpArgs="--enable-python3interp=dynamic"
+		rubyInterpArgs="--enable-rubyinterp=dynamic"
 		export CFLAGS="$(pkg-config --cflags python3) -fPIC -O2"
 	fi
 	export LDFLAGS="-lgnu"
@@ -111,7 +113,7 @@ BUILD()
 		--with-features=huge \
 		--enable-fail-if-missing=yes \
 		--enable-cscope \
-		--enable-rubyinterp=dynamic \
+		$rubyInterpArgs \
 		--with-compiledby=HaikuPorts \
 		$pythonInterpArgs
 #		--enable-luainterp=dynamic \ currently broken
@@ -129,7 +131,7 @@ BUILD()
 		--with-features=huge \
 		--enable-fail-if-missing=yes \
 		--enable-cscope \
-		--enable-rubyinterp=dynamic \
+		$rubyInterpArgs \
 		--with-compiledby=HaikuPorts \
 		$pythonInterpArgs
 #		--enable-luainterp=dynamic \ currently broken
