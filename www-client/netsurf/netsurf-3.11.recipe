@@ -8,7 +8,7 @@ features including tabbed browsing, bookmarks and page thumbnailing."
 HOMEPAGE="https://www.netsurf-browser.org/"
 COPYRIGHT="2003-2023 The NetSurf Browser project"
 LICENSE="GNU GPL v2"
-REVISION="4"
+REVISION="5"
 # Do NOT use the netsurf-all package. It contains a bunch of subprojects which
 # we build as separate packages so they can easily be used by other projects.
 SOURCE_URI="https://download.netsurf-browser.org/netsurf/releases/source/netsurf-$portVersion-src.tar.gz"
@@ -86,6 +86,7 @@ BUILD()
 	if [ "$targetArchitecture" = arm64 ]; then
 		export PKG_CONFIG_SYSROOT_DIR="$crossSysrootDir"
 		export PKG_CONFIG_LIBDIR="$crossSysrootDir/boot/system/develop/lib/pkgconfig"
+		export LDFLAGS="${LDFLAGS:+$LDFLAGS }-lgcc_s"
 		make TARGET=beos PREFIX=$prefix/ DESTDIR=$appsDir NETSURF_BEOS_BIN="/" \
 			CC="$targetMachineTriple-gcc" CXX="$targetMachineTriple-g++" \
 			BUILD=release $jobArgs
@@ -100,6 +101,7 @@ INSTALL()
 	if [ "$targetArchitecture" = arm64 ]; then
 		export PKG_CONFIG_SYSROOT_DIR="$crossSysrootDir"
 		export PKG_CONFIG_LIBDIR="$crossSysrootDir/boot/system/develop/lib/pkgconfig"
+		export LDFLAGS="${LDFLAGS:+$LDFLAGS }-lgcc_s"
 		make TARGET=beos PREFIX=$prefix/ DESTDIR=$appsDir NETSURF_BEOS_BIN="/" \
 			CC="$targetMachineTriple-gcc" CXX="$targetMachineTriple-g++" \
 			BUILD=release install
