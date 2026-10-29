@@ -186,6 +186,10 @@ BUILD()
 
 	# Cross compiling Python 3.14 needs a native build interpreter of the same minor version.
 	haikuTzPath=/boot/system/data/zoneinfo
+	PKG_CONFIG_SYSROOT_DIR="$crossSysrootDir"
+	PKG_CONFIG_LIBDIR="$crossSysrootDir/boot/system/develop/lib/pkgconfig:$crossSysrootDir/boot/system/lib/pkgconfig"
+	PKG_CONFIG_PATH=
+	export PKG_CONFIG_SYSROOT_DIR PKG_CONFIG_LIBDIR PKG_CONFIG_PATH
 	haikuConfigSite="$workDir/haiku-python-cross.site"
 	cat > "$haikuConfigSite" <<EOF
 ac_cv_file__dev_ptmx=yes
