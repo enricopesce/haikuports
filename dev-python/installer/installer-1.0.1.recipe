@@ -72,7 +72,7 @@ INSTALL()
 
 		# We don't use "build" here, to avoid circular depedencies later on.
 
-		$python -m flit_core.wheel
+		PYTHONPATH="$crossSysrootDir/boot/system/lib/$python/vendor-packages${PYTHONPATH:+:$PYTHONPATH}" $python -m flit_core.wheel
 		PYTHONPATH=src $python -m installer --prefix=$prefix dist/*.whl
 
 		packageEntries $pythonPackage \

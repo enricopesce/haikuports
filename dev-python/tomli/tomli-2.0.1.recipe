@@ -49,7 +49,7 @@ INSTALL()
 
 		python=python$pythonVersion
 
-		$python -m installer -p $prefix tomli-2.0.1-py3-none-any.whl
+		PYTHONPATH="$crossSysrootDir/boot/system/lib/$python/vendor-packages${PYTHONPATH:+:$PYTHONPATH}" $python -m installer -p $prefix tomli-2.0.1-py3-none-any.whl
 
 		packageEntries $pythonPackage \
 			$prefix/lib/python*
