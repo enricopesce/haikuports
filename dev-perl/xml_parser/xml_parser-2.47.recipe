@@ -61,6 +61,7 @@ BUILD()
 		sed -i \
 			-e "s|^PERL_INC = .*|PERL_INC = $perlCoreDir|" \
 			-e "s|^INC = .*|INC = -I$perlSourceDir -I$crossSysrootDir/boot/system/develop/headers|" \
+			-e "s|^LDDLFLAGS = .*|LDDLFLAGS = -shared|" \
 			Expat/Makefile
 	else
 		perl Makefile.PL PREFIX=$prefix
