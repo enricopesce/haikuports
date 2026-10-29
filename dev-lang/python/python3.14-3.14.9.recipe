@@ -94,7 +94,7 @@ REQUIRES="
 #	lib:libmpdec$secondaryArchSuffix	# bundled libmpdecimal scheduled for removal on 3.15
 	lib:libncursesw$secondaryArchSuffix
 	lib:libsqlite3$secondaryArchSuffix	# >= 3.15.2
-lib:libuuid$secondaryArchSuffix
+#lib:libuuid$secondaryArchSuffix
 	lib:libssl$secondaryArchSuffix
 	lib:libz$secondaryArchSuffix
 	lib:libzstd$secondaryArchSuffix
@@ -111,7 +111,7 @@ BUILD_REQUIRES="
 	devel:libncursesw$secondaryArchSuffix
 	devel:libsqlite3$secondaryArchSuffix
 	devel:libssl$secondaryArchSuffix
-devel:libuuid$secondaryArchSuffix
+#devel:libuuid$secondaryArchSuffix
 	devel:libz$secondaryArchSuffix
 	devel:libzstd$secondaryArchSuffix
 	"
