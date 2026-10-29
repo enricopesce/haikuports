@@ -79,7 +79,7 @@ INSTALL()
 	# remove architecture-specific files (this would be an "any" arch package,
 	# but it isn't because of different paths on secondaryArch)
 	cd $prefix
-	rm -r $(perl -V:vendorarch | cut -d\' -f2 | cut -d/ -f5-)
+	rm -rf $(perl -V:vendorarch | cut -d\' -f2 | cut -d/ -f5-)
 		# cut extracts the quoted string and strips the prefix (which is perl's and not ours)
 }
 
