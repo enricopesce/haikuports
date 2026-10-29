@@ -57,11 +57,30 @@ defineDebugInfoPackage json_c$secondaryArchSuffix \
 
 BUILD()
 {
-	cmake -Bbuild -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		$cmakeDirArgs . \
-		-DENABLE_THREADING=ON \
-		-DENABLE_RDRAND=OFF \
-		-DBUILD_STATIC_LIBS=OFF
+	if [ "$targetArchitecture" = arm64 ]; then
+		cmake -B build -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+			-DCMAKE_SYSTEM_NAME=Haiku \
+			-DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+			-DCMAKE_C_COMPILER="$targetMachineTriple-gcc" \
+			-DCMAKE_CXX_COMPILER="$targetMachineTriple-g++" \
+			-DCMAKE_SYSROOT="$crossSysrootDir" \
+			-DCMAKE_FIND_ROOT_PATH="$crossSysrootDir" \
+			-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+			-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+			-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+			-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+			-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+			$cmakeDirArgs \
+			-DENABLE_THREADING=ON \
+			-DENABLE_RDRAND=OFF \
+			-DBUILD_STATIC_LIBS=OFF
+	else
+		cmake -Bbuild -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+			$cmakeDirArgs . \
+			-DENABLE_THREADING=ON \
+			-DENABLE_RDRAND=OFF \
+			-DBUILD_STATIC_LIBS=OFF
+	fi
 
 	cmake --build build $jobArgs
 }
