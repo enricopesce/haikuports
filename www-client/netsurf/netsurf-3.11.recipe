@@ -83,6 +83,10 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
+	if [ "$targetArchitecture" = arm64 ]; then
+		export PKG_CONFIG_SYSROOT_DIR="$crossSysrootDir"
+		export PKG_CONFIG_LIBDIR="$crossSysrootDir/boot/system/develop/lib/pkgconfig"
+	fi
 	make TARGET=beos PREFIX=$prefix/ DESTDIR=$appsDir NETSURF_BEOS_BIN="/" \
 		BUILD=release $jobArgs
 }
