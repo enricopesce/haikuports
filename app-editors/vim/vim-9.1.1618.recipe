@@ -91,9 +91,13 @@ BUILD()
 	cd src
 	autoconf
 
-	export CFLAGS="\
-		`pkg-config --cflags python3` \
-		-fPIC -O2"
+	if [ "$targetArchitecture" = arm64 ]; then
+		pythonInterpArgs="--enable-python3interp=no"
+		export CFLAGS="-fPIC -O2"
+	else
+		pythonInterpArgs="--enable-python3interp=dynamic"
+		export CFLAGS="$(pkg-config --cflags python3) -fPIC -O2"
+	fi
 	export LDFLAGS="-lgnu"
 
 # CLI -------------------------------------------
@@ -109,7 +113,7 @@ BUILD()
 		--enable-cscope \
 		--enable-rubyinterp=dynamic \
 		--with-compiledby=HaikuPorts \
-		--enable-python3interp=dynamic
+		$pythonInterpArgs
 #		--enable-luainterp=dynamic \ currently broken
 #		--enable-tclinterp=dynamic \
 #		--enable-perlinterp=dynamic not dynamic yet
@@ -127,7 +131,7 @@ BUILD()
 		--enable-cscope \
 		--enable-rubyinterp=dynamic \
 		--with-compiledby=HaikuPorts \
-		--enable-python3interp=dynamic
+		$pythonInterpArgs
 #		--enable-luainterp=dynamic \ currently broken
 #		--enable-tclinterp=dynamic \
 #		--enable-perlinterp=dynamic not dynamic yet
