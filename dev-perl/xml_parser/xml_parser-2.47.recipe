@@ -49,6 +49,19 @@ BUILD()
 			CC=$targetMachineTriple-gcc LD=$targetMachineTriple-gcc \
 			EXPATLIBPATH=$crossSysrootDir/boot/system/develop/lib \
 			EXPATINCPATH=$crossSysrootDir/boot/system/develop/headers
+		haikuPortsBuildDir=$(cd "$crossSysrootDir/../../../../../.." && pwd)
+		perlCoreHeader=$(find "$crossSysrootDir/boot/system/lib/perl5" -path '*/CORE/perl.h' -print -quit)
+		perlSourceHeader=$(find "$haikuPortsBuildDir/dev-lang/perl" -path '*/sources/perl-*/haiku/haikuish.h' -print -quit)
+		if [ -z "$perlCoreHeader" ] || [ -z "$perlSourceHeader" ]; then
+			echo "Could not locate target Perl ARM64 development headers" >&2
+			exit 1
+		fi
+		perlCoreDir=${perlCoreHeader%/perl.h}
+		perlSourceDir=${perlSourceHeader%/haiku/haikuish.h}
+		sed -i \
+			-e "s|^PERL_INC = .*|PERL_INC = $perlCoreDir|" \
+			-e "s|^INC = .*|INC = -I$perlSourceDir -I$crossSysrootDir/boot/system/develop/headers|" \
+			Expat/Makefile
 	else
 		perl Makefile.PL PREFIX=$prefix
 	fi
