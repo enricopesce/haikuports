@@ -3,7 +3,7 @@ DESCRIPTION="XML-Parser - A perl module for parsing XML documents."
 HOMEPAGE="https://metacpan.org/pod/XML::Parser"
 COPYRIGHT="1998-2000 Larry Wall and Clark Cooper"
 LICENSE="Artistic"
-REVISION="3"
+REVISION="4"
 SOURCE_URI="https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-$portVersion.tar.gz"
 CHECKSUM_SHA256="ad4aae643ec784f489b956abe952432871a622d4e2b5c619e8855accbfc4d1d8"
 SOURCE_DIR="XML-Parser-$portVersion"
@@ -41,6 +41,10 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	if [ "$targetArchitecture" = arm64 ]; then
+		# Makefile.PL's Devel::CheckLib uses the build Perl's native compiler,
+		# so its link probe cannot validate Haiku ARM64 libraries. HaikuPorter
+		# already resolved libexpat's target development package for this build.
+		perl -0777 -i -pe 's/unless \(\s*check_lib\(.*?\n\) \{/if (0) {/s or die "could not disable host-only Expat probe\n"' Makefile.PL
 		perl Makefile.PL PREFIX=$prefix \
 			EXPATLIBPATH=$crossSysrootDir/boot/system/develop/lib \
 			EXPATINCPATH=$crossSysrootDir/boot/system/develop/headers
