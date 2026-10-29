@@ -143,7 +143,11 @@ BUILD()
 
 INSTALL()
 {
-	make install
+	if [ "$targetArchitecture" = arm64 ]; then
+		make install STRIP="$targetMachineTriple-strip"
+	else
+		make install
+	fi
 	ln -s vim $commandBinDir/vi
 
 	# cleanup
