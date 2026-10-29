@@ -293,6 +293,14 @@ BUILD()
 		# uses this explicit list after libstdc++ when built for the target.
 		hostLibs="-lstdc++ -lgcc_eh"
 	fi
+	if [ -n "$hostLibs" ]; then
+		# The child gcc Makefile is generated from this template after the
+		# top-level configure, so keep the ARM64 runtime libraries there.
+		sed -i "s/^HOST_LIBS =.*/override HOST_LIBS = $hostLibs/" "$sourceDir/gcc/Makefile.in"
+		grep -Fqx "override HOST_LIBS = $hostLibs" "$sourceDir/gcc/Makefile.in" || return 1
+		sed -i 's|$(LIBIBERTY) $(NETLIBS)|$(LIBIBERTY) $(NETLIBS) -Wl,--whole-archive '"$crossSysrootDir"'/boot/system/develop/lib/libgcc_eh.a -Wl,--no-whole-archive|' "$sourceDir/c++tools/Makefile.in"
+		grep -Fq "$crossSysrootDir/boot/system/develop/lib/libgcc_eh.a" "$sourceDir/c++tools/Makefile.in" || return 1
+	fi
 	if [ "$isCrossRepository" = true ]; then
 		buildConfigureFlags="--build=$buildMachineTriple --host=$targetMachineTriple --target=$targetMachineTriple"
 		sanitizerConfigureFlag=--disable-libsanitizer
@@ -331,7 +339,23 @@ BUILD()
 
 
 	if [ -n "$hostLibs" ]; then
-		make $jobArgs HOST_LIBS="$hostLibs"
+		if ! make $jobArgs HOST_LIBS="$hostLibs"; then
+			# The top-level GCC build can leave gcov tools linked without the
+			# ARM64 unwinder; relink those targets directly, then resume the build.
+			if [ ! -f "$objectsDir/gcc/Makefile" ]; then
+				return 1
+			fi
+			sed -i "s/^HOST_LIBS =.*/override HOST_LIBS = $hostLibs/" "$objectsDir/gcc/Makefile"
+			grep -Fqx "override HOST_LIBS = $hostLibs" "$objectsDir/gcc/Makefile" || return 1
+			make -C "$objectsDir/gcc" $jobArgs gcov gcov-dump xgcc lto-wrapper cpp xg++ gfortran gcov-tool collect2 || return $?
+			if [ -f "$objectsDir/c++tools/Makefile" ]; then
+				if ! grep -Fq "$crossSysrootDir/boot/system/develop/lib/libgcc_eh.a" "$objectsDir/c++tools/Makefile"; then
+					sed -i 's|$(LIBIBERTY) $(NETLIBS)|$(LIBIBERTY) $(NETLIBS) -Wl,--whole-archive '"$crossSysrootDir"'/boot/system/develop/lib/libgcc_eh.a -Wl,--no-whole-archive|' "$objectsDir/c++tools/Makefile"
+				fi
+				make -C "$objectsDir/c++tools" $jobArgs g++-mapper-server || return $?
+			fi
+			make $jobArgs HOST_LIBS="$hostLibs" || return $?
+		fi
 	else
 		make $jobArgs
 	fi

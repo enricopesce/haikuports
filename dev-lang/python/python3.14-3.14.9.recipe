@@ -118,7 +118,7 @@ BUILD_REQUIRES="
 BUILD_PREREQUIRES="
 	autoconf_archive
 	cmd:aclocal # >= 1.16.4
-	cmd:autoconf # >= 2.71
+	cmd:autoconf # >= 2.72
 	cmd:find
 	cmd:gcc$secondaryArchSuffix
 	cmd:ld$secondaryArchSuffix
