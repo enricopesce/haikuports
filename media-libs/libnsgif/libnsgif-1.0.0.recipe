@@ -10,6 +10,13 @@ CHECKSUM_SHA256="6014c842f61454d2f5a0f8243d7a8d7bde9b7da3ccfdca2d346c7c0b2c4c061
 ARCHITECTURES="all !x86_gcc2"
 SECONDARY_ARCHITECTURES="x86"
 
+if [ "$targetArchitecture" = arm64 ]; then
+	nsbuildDir="$crossSysrootDir/boot/system/data/netsurf-buildsystem/makefiles"
+else
+	nsbuildDir="/system/data/netsurf-buildsystem/makefiles"
+fi
+
+
 libVersion="$portVersion"
 libVersionCompat="$libVersion compat >= ${libVersion%%.*}"
 
@@ -40,13 +47,13 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
-	make PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem \
+	make PREFIX="$prefix" NSBUILD="$nsbuildDir" \
 		COMPONENT_TYPE=lib-shared
 }
 
 INSTALL()
 {
-	make PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem \
+	make PREFIX="$prefix" NSBUILD="$nsbuildDir" \
 		COMPONENT_TYPE=lib-shared \
 		INCLUDEDIR=$relativeIncludeDir install \
 		LIBDIR=$relativeLibDir

@@ -11,6 +11,13 @@ CHECKSUM_SHA256="232ce0f66cbc2c3eed6288ae26de2c567bbfbbc01d8b0f6fc6c1c1649d4b385
 ARCHITECTURES="all !x86_gcc2"
 SECONDARY_ARCHITECTURES="x86"
 
+if [ "$targetArchitecture" = arm64 ]; then
+	nsbuildDir="$crossSysrootDir/boot/system/data/netsurf-buildsystem/makefiles"
+else
+	nsbuildDir="/system/data/netsurf-buildsystem/makefiles"
+fi
+
+
 PROVIDES="
 	nsgenbind$secondaryArchSuffix = $portVersion
 	cmd:nsgenbind = $portVersion
@@ -32,15 +39,15 @@ BUILD_PREREQUIRES="
 
 BUILD()
 {
-	make PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem
+	make PREFIX="$prefix" NSBUILD="$nsbuildDir"
 }
 
 INSTALL()
 {
-	make install PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem
+	make install PREFIX="$prefix" NSBUILD="$nsbuildDir"
 }
 
 TEST()
 {
-	make PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem test
+	make PREFIX="$prefix" NSBUILD="$nsbuildDir" test
 }

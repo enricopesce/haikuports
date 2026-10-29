@@ -11,6 +11,13 @@ CHECKSUM_SHA256="2df215bbec34d51d60c1a04b01b2df4d5d18f510f1f3a7af4b80cddb5671154
 ARCHITECTURES="all !x86_gcc2"
 SECONDARY_ARCHITECTURES="x86"
 
+if [ "$targetArchitecture" = arm64 ]; then
+	nsbuildDir="$crossSysrootDir/boot/system/data/netsurf-buildsystem/makefiles"
+else
+	nsbuildDir="/system/data/netsurf-buildsystem/makefiles"
+fi
+
+
 libVersion="$portVersion"
 libVersionCompat="$libVersion compat >= ${libVersion%%.*}"
 
@@ -52,13 +59,13 @@ defineDebugInfoPackage libcss$secondaryArchSuffix $libDir/libcss.so.$libVersion
 
 BUILD()
 {
-	make PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem \
+	make PREFIX="$prefix" NSBUILD="$nsbuildDir" \
 		COMPONENT_TYPE=lib-shared VARIANT=debug
 }
 
 INSTALL()
 {
-	make PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem \
+	make PREFIX="$prefix" NSBUILD="$nsbuildDir" \
 		COMPONENT_TYPE=lib-shared VARIANT=debug \
 		INCLUDEDIR=$relativeIncludeDir \
 		LIBDIR=$relativeLibDir \
@@ -74,6 +81,6 @@ INSTALL()
 
 TEST()
 {
-	make test PREFIX="$prefix" NSBUILD=/system/data/netsurf-buildsystem \
+	make test PREFIX="$prefix" NSBUILD="$nsbuildDir" \
 		LDFLAGS="-liconv -lwapcaplet -lparserutils"
 }

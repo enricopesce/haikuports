@@ -10,6 +10,13 @@ CHECKSUM_SHA256="317ed5c718f17927b5721974bae5de32c3fd6d055db131ad31b4312a032ed13
 ARCHITECTURES="all"
 SECONDARY_ARCHITECTURES="x86_gcc2 x86"
 
+if [ "$targetArchitecture" = arm64 ]; then
+	nsbuildDir="$crossSysrootDir/boot/system/data/netsurf-buildsystem/makefiles"
+else
+	nsbuildDir="/system/data/netsurf-buildsystem/makefiles"
+fi
+
+
 libVersion="$portVersion"
 libVersionCompat="$libVersion compat >= ${libVersion%%.*}"
 
@@ -46,13 +53,13 @@ BUILD_PREREQUIRES="
 BUILD()
 {
 	# Build the shared lib
-	CFLAGS=-Wno-error make PREFIX=$prefix NSBUILD=/system/data/netsurf-buildsystem \
+	CFLAGS=-Wno-error make PREFIX=$prefix NSBUILD="$nsbuildDir" \
 		COMPONENT_TYPE=lib-shared
 }
 
 INSTALL()
 {
-	make install PREFIX=$prefix NSBUILD=/system/data/netsurf-buildsystem \
+	make install PREFIX=$prefix NSBUILD="$nsbuildDir" \
 		INCLUDEDIR=$relativeIncludeDir LIBDIR=$relativeLibDir COMPONENT_TYPE=lib-shared
 
 	prepareInstalledDevelLib libparserutils
@@ -63,6 +70,6 @@ INSTALL()
 
 TEST()
 {
-	make PREFIX=$prefix NSBUILD=/system/data/netsurf-buildsystem \
+	make PREFIX=$prefix NSBUILD="$nsbuildDir" \
 		LDFLAGS=-liconv test
 }
