@@ -21,6 +21,8 @@ SECONDARY_ARCHITECTURES="x86"
 
 if [ "$targetArchitecture" = arm64 ]; then
 	nsbuildDir="$crossSysrootDir/boot/system/data/netsurf-buildsystem/makefiles"
+	export HOST="$targetMachineTriple"
+	export VARIANT=debug
 else
 	nsbuildDir="/system/data/netsurf-buildsystem/makefiles"
 fi
