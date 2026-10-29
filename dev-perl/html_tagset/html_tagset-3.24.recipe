@@ -43,8 +43,11 @@ INSTALL()
 
 	# remove architecture-specific files
 	cd $prefix
-	rm -r $(perl -V:vendorarch | cut -d\' -f2 | cut -d/ -f5-)
-		# cut extracts the quoted string and strips the prefix (which is perl's and not ours)
+	archFiles=$(perl -V:vendorarch | cut -d\' -f2 | cut -d/ -f5-)
+	if [ -d "$archFiles" ]; then
+		rm -r "$archFiles"
+	fi
+	# cut extracts the quoted string and strips the prefix (which is perl's and not ours)
 }
 
 TEST()
