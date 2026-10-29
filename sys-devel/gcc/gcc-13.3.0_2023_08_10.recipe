@@ -287,6 +287,12 @@ BUILD()
 	local buildConfigureFlags="--build=$effectiveTargetMachineTriple"
 	local crossConfigureFlags=
 	local sanitizerConfigureFlag=--enable-libsanitizer
+	local hostLibs=
+	if [ "$isCrossRepository" = true ] && [ "$targetArchitecture" = "arm64" ]; then
+		# Haiku splits the ARM64 unwinder into libgcc_eh.a. GCC's xgcc link
+		# uses this explicit list after libstdc++ when built for the target.
+		hostLibs="-lstdc++ -lgcc_eh"
+	fi
 	if [ "$isCrossRepository" = true ]; then
 		buildConfigureFlags="--build=$buildMachineTriple --host=$targetMachineTriple --target=$targetMachineTriple"
 		sanitizerConfigureFlag=--disable-libsanitizer
@@ -302,11 +308,6 @@ BUILD()
 		export CPPFLAGS="-I$crossSysrootDir/boot/system/develop/headers -I$sanitizerPrivateHeaders"
 		export EXTRA_CXXFLAGS="-I$sanitizerPrivateHeaders -I$sanitizerPrivateHeaders/system/arch/$targetArchitecture -I$sanitizerPrivateHeaders/system"
 		export LDFLAGS="-L$crossSysrootDir/boot/system/develop/lib -L$crossSysrootDir/boot/system/lib"
-		if [ "$targetArchitecture" = "arm64" ]; then
-			# ARM64 Haiku keeps the unwinder in libgcc_eh.a. GCC's cross build
-			# otherwise links xgcc against libgcc.a alone via its C++ driver.
-			export HOST_LIBS="-lstdc++ -lgcc_eh"
-		fi
 		unset CPATH LIBRARY_PATH
 		export ac_cv_c_bigendian=no
 		export CC=$targetMachineTriple-gcc CXX=$targetMachineTriple-g++ AR=$targetMachineTriple-ar RANLIB=$targetMachineTriple-ranlib
@@ -329,7 +330,11 @@ BUILD()
 		$additionalConfigureFlags $crossConfigureFlags
 
 
-	make $jobArgs
+	if [ -n "$hostLibs" ]; then
+		make $jobArgs HOST_LIBS="$hostLibs"
+	else
+		make $jobArgs
+	fi
 
 	echo "#################### building special libraries ####################"
 
