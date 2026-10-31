@@ -16,7 +16,7 @@ HOMEPAGE="https://www.perl.org/"
 COPYRIGHT="1993-2026 Larry Wall and others"
 LICENSE="GNU GPL v1
 	Artistic"
-REVISION="3"
+REVISION="4"
 perlShortVersion="${portVersion%.*}"
 SOURCE_URI="https://www.cpan.org/src/perl-$portVersion.tar.gz"
 CHECKSUM_SHA256="9384e8deb75b7b1695e5637971b752281aaecd025a3d5d4734d33c1d0adfee47"
@@ -130,19 +130,20 @@ BUILD()
 		perlLibc="$crossSysrootDir/boot/system/lib/libroot.so"
 		perlPrefix="$prefix"
 		local perlToolBin="$workDir/arm64-cross-tool-prefix"
-		mkdir -p "$perlToolBin"
+		local perlCompilerBin="$workDir/arm64-cross-compiler-prefix"
+		mkdir -p "$perlToolBin" "$perlCompilerBin"
 		ln -sf "$(command -v "$targetMachineTriple-as")" "$perlToolBin/as"
 		ln -sf "$(command -v "$targetMachineTriple-ld")" "$perlToolBin/ld"
 		ln -sf "$(command -v "$targetMachineTriple-ar")" "$perlToolBin/$targetMachineTriple-ar"
 		ln -sf "$(command -v "$targetMachineTriple-nm")" "$perlToolBin/$targetMachineTriple-nm"
 		ln -sf "$(command -v "$targetMachineTriple-ranlib")" "$perlToolBin/$targetMachineTriple-ranlib"
 		local perlGcc="$(command -v "$targetMachineTriple-gcc")"
-		cat > "$perlToolBin/$targetMachineTriple-gcc" << EOF
+		cat > "$perlCompilerBin/$targetMachineTriple-gcc" << EOF
 #!/bin/sh
 exec "$perlGcc" -B"$perlToolBin/" -D_ALL_SOURCE -fno-stack-protector -std=gnu99 "\$@"
 EOF
-		chmod +x "$perlToolBin/$targetMachineTriple-gcc"
-		export PATH="$perlToolBin:$PATH"
+		chmod +x "$perlCompilerBin/$targetMachineTriple-gcc"
+		export PATH="$perlCompilerBin:$PATH"
 		perlCC="$targetMachineTriple-gcc"
 		perlLD="$perlCC"
 		crossArgs="-Dusecrosscompile -Dknowitall -Duse64bitint -Dintsize=4 -Dshortsize=2 -Dlongsize=8 -Dlonglongsize=8 -Dptrsize=8 -Ddoublesize=8 -Dlseeksize=8 -Di_sys_types=define -Di_stdint=define -Di_inttypes=define -Di_sys_uio=define -Di_unistd=define -Du16type=uint16_t -Du32type=uint32_t -Di32type=int32_t -Divdformat='"ld"' -Duvuformat='"lu"' -Duvoformat='"lo"' -Duvxformat='"lx"' -DuvXUformat='"lX"' -DsPRId64='"ld"' -DsPRIi64='"li"' -DsPRIu64='"lu"' -DsPRIo64='"lo"' -DsPRIx64='"lx"' -DsPRIXU64='"lX"' -Di32dformat='"d"' -Du32uformat='"u"' -Du32oformat='"o"' -Du32xformat='"x"' -Du32XUformat='"X"' -Dbyteorder=12345678 -Dd_gettimeod=define -Dalignbytes=8 -Dcharbits=8 -Dd_writev=define -Dosname=haiku -Dtargethost=localhost -Dtargetrun=adb -Dtargetto=cp -Dtargetfrom=cp -Dtargetdir=$PWD -Darchname=$perlArchName -Dccflags=--sysroot=$crossSysrootDir -Dldflags=--sysroot=$crossSysrootDir"
