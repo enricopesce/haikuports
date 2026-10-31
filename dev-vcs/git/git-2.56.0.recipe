@@ -10,7 +10,7 @@ workflows."
 HOMEPAGE="https://git-scm.com/"
 COPYRIGHT="2005-2025 Git Authors (see git web site for list)"
 LICENSE="GNU GPL v2"
-REVISION="1"
+REVISION="2"
 SOURCE_URI="https://www.kernel.org/pub/software/scm/git/git-$portVersion.tar.xz"
 CHECKSUM_SHA256="26c56c296b38c0695b26fa95f475f1d01704d2d38e73465ca30b0b2f5dc789d3"
 SOURCE_URI_2="https://www.kernel.org/pub/software/scm/git/git-manpages-$portVersion.tar.xz"
@@ -175,6 +175,14 @@ TEST_REQUIRES="
 makeGit()
 {
 	local gitCC="$CC"
+	local perlLibDir
+	if [ "$targetArchitecture" = arm64 ]; then
+		# The Linux host Perl path is not the target Haiku vendor module path.
+		# Keep this in sync with perl's perlShortVersion in the arm64 tree.
+		perlLibDir="$prefix/lib/perl5/vendor_perl/5.42"
+	else
+		perlLibDir=$prefix/$(perl -V:installvendorlib | cut -d\' -f2 | cut -d/ -f5-)
+	fi
 	if [ "$targetArchitecture" = arm64 ]; then
 		gitCC="$targetMachineTriple-gcc --sysroot=$crossSysrootDir"
 	fi
@@ -201,7 +209,7 @@ makeGit()
 		NO_GETTEXT=YesPlease \
 		NO_TCLTK=YesPlease \
 		PERL_PATH=/bin/perl \
-		perllibdir=$prefix/$(perl -V:installvendorlib | cut -d\' -f2 | cut -d/ -f5-) \
+		perllibdir=$perlLibDir \
 		NO_PYTHON=YesPlease \
 		OBJECT_CREATION_USES_RENAMES=YesPlease \
 		NO_CROSS_DIRECTORY_HARDLINKS=YesPlease \

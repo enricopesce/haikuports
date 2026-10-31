@@ -7,7 +7,7 @@ of your choice."
 HOMEPAGE="https://cmake.org/"
 COPYRIGHT="2002-2026 Kitware, Inc., Insight Consortium"
 LICENSE="CMake"
-REVISION="2"
+REVISION="3"
 SOURCE_URI="https://cmake.org/files/v${portVersion%.*}/cmake-$portVersion.tar.gz"
 CHECKSUM_SHA256="bd24c30d80a7744ae84b845ff080cc8453b06c622ef01066564108e9cefc44cf"
 PATCHES="cmake-$portVersion.patchset"
@@ -150,6 +150,28 @@ INSTALL()
 		DESTDIR="$installDestDir" /usr/bin/cmake --install "$sourceDir/arm64-build" --prefix "$prefix"
 	else
 		make install
+	fi
+
+	# Relocate upstream GNU-style paths into HaikuPorter's standard directories.
+	local installPrefix="$installDestDir$prefix"
+	local cmakeDocDir="$installPrefix/doc/cmake-$(echo "$portVersion" | cut -d. -f1-2)"
+	if [ -d "$cmakeDocDir" ]; then
+		mkdir -p "$installDestDir$docDir"
+		mv "$cmakeDocDir" "$installDestDir$docDir/"
+		rmdir "$installPrefix/doc" 2>/dev/null || true
+	fi
+
+	local cmakeMacro="$installPrefix/share/aclocal/cmake.m4"
+	if [ -f "$cmakeMacro" ]; then
+		mkdir -p "$installDestDir$dataDir/aclocal"
+		mv "$cmakeMacro" "$installDestDir$dataDir/aclocal/"
+		rmdir "$installPrefix/share/aclocal" "$installPrefix/share" 2>/dev/null || true
+	fi
+
+	if [ -d "$installPrefix/doc" ] || [ -d "$installPrefix/share" ]; then
+		echo "CMake install left files outside Haiku's documentation/data directories" >&2
+		find "$installPrefix/doc" "$installPrefix/share" -mindepth 1 -maxdepth 3 -print >&2 2>/dev/null || true
+		exit 1
 	fi
 }
 
