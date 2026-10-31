@@ -16,7 +16,7 @@ HOMEPAGE="https://www.perl.org/"
 COPYRIGHT="1993-2026 Larry Wall and others"
 LICENSE="GNU GPL v1
 	Artistic"
-REVISION="2"
+REVISION="3"
 perlShortVersion="${portVersion%.*}"
 SOURCE_URI="https://www.cpan.org/src/perl-$portVersion.tar.gz"
 CHECKSUM_SHA256="9384e8deb75b7b1695e5637971b752281aaecd025a3d5d4734d33c1d0adfee47"
@@ -128,7 +128,7 @@ BUILD()
 		perlUsrinc="$crossSysrootDir/boot/system/develop/headers/posix"
 		perlLocinc="$crossSysrootDir/boot/system/develop/headers"
 		perlLibc="$crossSysrootDir/boot/system/lib/libroot.so"
-		perlPrefix="$installDestDir$prefix"
+		perlPrefix="$prefix"
 		local perlToolBin="$workDir/arm64-cross-tool-prefix"
 		mkdir -p "$perlToolBin"
 		ln -sf "$(command -v "$targetMachineTriple-as")" "$perlToolBin/as"
@@ -142,7 +142,8 @@ BUILD()
 exec "$perlGcc" -B"$perlToolBin/" -D_ALL_SOURCE -fno-stack-protector -std=gnu99 "\$@"
 EOF
 		chmod +x "$perlToolBin/$targetMachineTriple-gcc"
-		perlCC="$perlToolBin/$targetMachineTriple-gcc"
+		export PATH="$perlToolBin:$PATH"
+		perlCC="$targetMachineTriple-gcc"
 		perlLD="$perlCC"
 		crossArgs="-Dusecrosscompile -Dknowitall -Duse64bitint -Dintsize=4 -Dshortsize=2 -Dlongsize=8 -Dlonglongsize=8 -Dptrsize=8 -Ddoublesize=8 -Dlseeksize=8 -Di_sys_types=define -Di_stdint=define -Di_inttypes=define -Di_sys_uio=define -Di_unistd=define -Du16type=uint16_t -Du32type=uint32_t -Di32type=int32_t -Divdformat='"ld"' -Duvuformat='"lu"' -Duvoformat='"lo"' -Duvxformat='"lx"' -DuvXUformat='"lX"' -DsPRId64='"ld"' -DsPRIi64='"li"' -DsPRIu64='"lu"' -DsPRIo64='"lo"' -DsPRIx64='"lx"' -DsPRIXU64='"lX"' -Di32dformat='"d"' -Du32uformat='"u"' -Du32oformat='"o"' -Du32xformat='"x"' -Du32XUformat='"X"' -Dbyteorder=12345678 -Dd_gettimeod=define -Dalignbytes=8 -Dcharbits=8 -Dd_writev=define -Dosname=haiku -Dtargethost=localhost -Dtargetrun=adb -Dtargetto=cp -Dtargetfrom=cp -Dtargetdir=$PWD -Darchname=$perlArchName -Dccflags=--sysroot=$crossSysrootDir -Dldflags=--sysroot=$crossSysrootDir"
 	else
@@ -155,7 +156,7 @@ EOF
 		# Configure's C99 probe tries to run a target binary directly.
 		sed -i 's/\&\& \.\/try; then/\&\& true; then/' Configure
 	fi
-	./Configure 		-Dprefix=$perlPrefix 		-Dprivlib=$perlPrefix/lib/perl5/$portVersion 		-Dman1dir=$installDestDir$documentationDir/man/man1 		-Dman3dir=$installDestDir$documentationDir/man/man3 		-Dsiteprefix=$perlPrefix/non-packaged 		-Dsitelib=$perlPrefix/non-packaged/lib/perl5/site_perl/$perlShortVersion 		-Dsiteman1dir=$perlPrefix/non-packaged/$relativeManDir/man1 		-Dsiteman3dir=$perlPrefix/non-packaged/$relativeManDir/man3 		-Dvendorprefix=$perlPrefix 		-Dvendorlib=$perlPrefix/lib/perl5/vendor_perl/$perlShortVersion 		-Dvendorman1dir=$manDir/man1 		-Dvendorman3dir=$manDir/man3 		-Dcf_email=zooey@hirschkaefer.de 		-Uusenm -Duseshrplib -Dusethreads -Uusemymalloc 		-Dlibpth="$perlLibpth" 		-Dusrinc="$perlUsrinc" 		-Dlocinc="$perlLocinc" 		-Dlibc="$perlLibc" 		-Dlibs=-lnetwork -Dcc="$perlCC" -Dld="$perlLD" $crossArgs 		-Ud_link -Ddont_use_nlink -Ud_syserrlst 		-Dldlibpthname=LIBRARY_PATH -Dstartperl="#! perl" 		-Dccdlflags="-Wl,-fno-stack-protector,-rpath=$prefix/lib/perl5/$portVersion/$perlArchName/CORE" 		-Dusesitecustomize 		-de
+	./Configure 		-Dprefix=$perlPrefix 		-Dprivlib=$perlPrefix/lib/perl5/$portVersion 		-Dman1dir=$manDir/man1 		-Dman3dir=$manDir/man3 		-Dsiteprefix=$perlPrefix/non-packaged 		-Dsitelib=$perlPrefix/non-packaged/lib/perl5/site_perl/$perlShortVersion 		-Dsiteman1dir=$perlPrefix/non-packaged/$relativeManDir/man1 		-Dsiteman3dir=$perlPrefix/non-packaged/$relativeManDir/man3 		-Dvendorprefix=$perlPrefix 		-Dvendorlib=$perlPrefix/lib/perl5/vendor_perl/$perlShortVersion 		-Dvendorman1dir=$manDir/man1 		-Dvendorman3dir=$manDir/man3 		-Dcf_email=zooey@hirschkaefer.de 		-Uusenm -Duseshrplib -Dusethreads -Uusemymalloc 		-Dlibpth="$perlLibpth" 		-Dusrinc="$perlUsrinc" 		-Dlocinc="$perlLocinc" 		-Dlibc="$perlLibc" 		-Dlibs=-lnetwork -Dcc="$perlCC" -Dld="$perlLD" $crossArgs 		-Ud_link -Ddont_use_nlink -Ud_syserrlst 		-Dldlibpthname=LIBRARY_PATH -Dstartperl="#! perl" 		-Dccdlflags="-Wl,-fno-stack-protector,-rpath=$prefix/lib/perl5/$portVersion/$perlArchName/CORE" 		-Dusesitecustomize 		-de
 
 	if [ "$targetArchitecture" = arm64 ]; then
 		# Time::HiRes is configured by the target miniperl; preserve the verified target API despite failed cross probes.
@@ -203,7 +204,7 @@ EOF
 INSTALL()
 {
 	if [ "$targetArchitecture" = arm64 ]; then
-		make install PERL=$PWD/host/miniperl
+		DESTDIR="$installDestDir" make install PERL="$PWD/host/miniperl"
 	else
 		make install
 	fi

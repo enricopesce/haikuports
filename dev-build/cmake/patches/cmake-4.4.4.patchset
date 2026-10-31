@@ -109,7 +109,8 @@ index c97e1f8..e108831 100644
 +++ b/Source/CMakeInstallDestinations.cmake
 @@ -1,11 +1,11 @@
  # Keep formatting here consistent with bootstrap script expectations.
- if(BEOS)
+-if(BEOS)
++if(BEOS OR CMAKE_SYSTEM_NAME STREQUAL "Haiku")
    set(CMAKE_BIN_DIR_DEFAULT "bin") # HAIKU
 -  set(CMAKE_DATA_DIR_DEFAULT "share/cmake-${CMake_VERSION_MAJOR}.${CMake_VERSION_MINOR}") # HAIKU
 +  set(CMAKE_DATA_DIR_DEFAULT "data/cmake-${CMake_VERSION_MAJOR}.${CMake_VERSION_MINOR}") # HAIKU

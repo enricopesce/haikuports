@@ -7,7 +7,7 @@ of your choice."
 HOMEPAGE="https://cmake.org/"
 COPYRIGHT="2002-2026 Kitware, Inc., Insight Consortium"
 LICENSE="CMake"
-REVISION="3"
+REVISION="4"
 SOURCE_URI="https://cmake.org/files/v${portVersion%.*}/cmake-$portVersion.tar.gz"
 CHECKSUM_SHA256="bd24c30d80a7744ae84b845ff080cc8453b06c622ef01066564108e9cefc44cf"
 PATCHES="cmake-$portVersion.patchset"
@@ -96,6 +96,8 @@ BUILD()
 
 	if [ "$targetArchitecture" = "arm64" ]; then
 		local buildDir="$sourceDir/arm64-build"
+		local cmakeVersionMinor="${portVersion%.*}"
+		local cmakeDataDir="$relativeDataDir/cmake-$cmakeVersionMinor"
 		/usr/bin/cmake -S "$sourceDir" -B "$buildDir" -G "Unix Makefiles" \
 			-DCMAKE_SYSTEM_NAME=Haiku \
 			-DCMAKE_SYSTEM_PROCESSOR=aarch64 \
@@ -110,7 +112,10 @@ BUILD()
 			-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
 			-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 			-DCMAKE_INSTALL_PREFIX="$prefix" \
-			-DCMAKE_INSTALL_DATADIR="$relativeDataDir/cmake" \
+			-DCMAKE_DATA_DIR="$cmakeDataDir" \
+			-DCMAKE_DOC_DIR="$relativeDocDir" \
+			-DCMAKE_XDGDATA_DIR="$relativeDataDir" \
+			-DCMAKE_INSTALL_DATADIR="$cmakeDataDir" \
 			-DCMAKE_INSTALL_DOCDIR="$relativeDocDir" \
 			-DCMAKE_INSTALL_MANDIR="$relativeManDir" \
 			-DCMAKE_INSTALL_XDGDATADIR="$relativeDataDir" \
